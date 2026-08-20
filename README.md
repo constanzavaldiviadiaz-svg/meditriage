@@ -1,4 +1,3 @@
-<img width="1011" height="610" alt="image" src="https://github.com/user-attachments/assets/6de9a830-af61-49d5-8f9b-1107ca2c1b6a" /># MediTriage
 
 ## Iniciativa
 
