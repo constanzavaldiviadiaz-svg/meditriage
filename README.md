@@ -1,10 +1,10 @@
-# MediTriage
+<img width="1011" height="610" alt="image" src="https://github.com/user-attachments/assets/6de9a830-af61-49d5-8f9b-1107ca2c1b6a" /># MediTriage
 
 ## Iniciativa
 
 **MediTriage — Triage clínico asistido por IA**
 
-Plataforma de apoyo al triage clínico que utiliza inteligencia artificial para ayudar a priorizar pacientes según sus síntomas y signos vitales.
+Sistema que utiliza inteligencia artificial para ayudar a ordenar y priorizar pacientes según sus síntomas y signos vitales.
 
 ## Equipo
 
@@ -13,7 +13,7 @@ Fernando: Tech Lead + DevSecOps Lead
 
 ## Objetivo
 
-Desarrollar un MVP que permita registrar pacientes, ingresar información clínica y generar una recomendación de prioridad mediante IA, manteniendo trazabilidad de las decisiones.
+Crear un sistema que permita ingresar información de un paciente y entregar una recomendación de prioridad mediante IA.
 
 ## Documentación
 
