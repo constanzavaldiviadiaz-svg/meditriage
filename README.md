@@ -8,10 +8,8 @@ Plataforma de apoyo al triage clínico que utiliza inteligencia artificial para 
 
 ## Equipo
 
-| Integrantes   | Rol                                  |
-| ------------- | ------------------------------------ |
-| Constanza     | Product Owner + QA Lead              |
-| Fernando      | Tech Lead + DevSecOps Lead           |
+Constanza: Product Owner + QA Lead             
+Fernando: Tech Lead + DevSecOps Lead          
 
 ## Objetivo
 
