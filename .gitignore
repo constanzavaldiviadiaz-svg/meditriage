@@ -1,0 +1,23 @@
+# Secretos y configuración local.
+# MediTriage maneja datos de salud (Ley 19.628 y Ley 21.719): nada de esto se sube.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials.json
+
+# Datos clínicos: nunca versionar datos reales de pacientes.
+data/
+*.csv
+*.xlsx
+!docs/**/*.csv
+
+# Editores y sistema operativo
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+desktop.ini
+*.swp

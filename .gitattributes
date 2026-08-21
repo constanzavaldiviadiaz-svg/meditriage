@@ -1,0 +1,7 @@
+# Normaliza saltos de línea: Constanza edita desde la web (LF) y Fernando en Windows (CRLF).
+# Sin esto, los diffs muestran archivos completos como modificados.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
