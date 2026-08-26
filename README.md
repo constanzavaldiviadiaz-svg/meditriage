@@ -7,8 +7,12 @@ Sistema que utiliza inteligencia artificial para ayudar a ordenar y priorizar pa
 
 ## Equipo
 
-Constanza: Product Owner + QA Lead             
-Fernando: Tech Lead + DevSecOps Lead          
+| Integrante | Rol |
+|---|---|
+| Constanza Valdivia | Product Owner |
+| Fernando Ureta | Tech Lead · AI/Data Lead |
+| Matías Sepúlveda | DevSecOps Lead |
+| Matías Casa | QA Lead |
 
 ## Objetivo
 
