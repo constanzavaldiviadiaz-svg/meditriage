@@ -8,7 +8,7 @@ MediTriage — Triage clínico asistido por IA. Proyecto del ramo **Taller de In
 Software** (18 sesiones). No es un repo de producto: es un repo académico donde **cada
 sesión de clase aporta un artefacto entregable**, evaluado con rúbrica.
 
-**Sesión vigente: S01.** No adelantarse a sesiones que el equipo aún no ha cursado: crear
+**Sesión vigente: S02.** La S01 fue entregada y aprobada por el docente. No adelantarse a sesiones que el equipo aún no ha cursado: crear
 artefactos de sesiones futuras desordena la cronología del repo y contradice la política de
 IA del ramo. Actualizar esta línea al avanzar de sesión.
 
@@ -40,16 +40,19 @@ explica el porqué · tablero para personal médico con priorización dinámica 
 
 ## Equipo y límites de rol
 
-- **Constanza** (`constanzavaldiviadiaz-svg`) — Product Owner + QA Lead. **Dueña del repo**
-  (única con permisos de admin: branch protection y settings son suyos).
-- **Fernando** (`fernandoureta`) — Tech Lead + DevSecOps Lead. Colaborador.
+- **Constanza Valdivia** (`constanzavaldiviadiaz-svg`) — Product Owner. **Dueña del repo**:
+  única con permiso de admin, así que branch protection, settings y colaboradores son suyos.
+- **Fernando Ureta** (`fernandoureta`) — Tech Lead + AI/Data Lead. Colaborador.
+- **Matías Sepúlveda** (`ByRetro`) — DevSecOps Lead. Colaborador.
+- **Matías Casa** — QA Lead. **Todavía no agregado como colaborador del repositorio.**
 
-El límite importa: arquitectura, stack, ADRs, pipelines y seguridad son decisión del Tech
-Lead. **Contenido y prioridad del backlog son decisión de la PO** — no reescribir issues ni
-re-priorizar por cuenta propia; proponer, no imponer.
+Los límites importan:
 
-El equipo son 2 personas; el ramo contempla 4–5 y cinco roles (PO, Tech Lead, DevSecOps,
-AI/Data, QA). El rol de AI/Data Lead está sin asignar.
+- **Producto** (qué se construye, en qué orden, contenido del backlog): decide la PO.
+  Proponer, no imponer.
+- **Arquitectura, stack y ADRs**: decide el Tech Lead.
+- **Pipelines, seguridad y protección de ramas**: decide el DevSecOps Lead.
+- **Estrategia de pruebas y criterios de aceptación**: decide el QA Lead.
 
 ## Flujo de trabajo con Git
 
@@ -73,8 +76,10 @@ toda contribución hecha con IA, pero Fernando evalúa y redacta él esa declara
 
 ## Definition of Done (del CHARTER, es vinculante)
 
-Una tarea está terminada cuando: cumple lo solicitado · fue probada · **fue revisada por el
-otro integrante** · se hizo el commit · el issue fue actualizado o cerrado.
+Una tarea está terminada cuando: cumple lo solicitado · fue probada · **fue revisada y
+aprobada por al menos otro integrante mediante Pull Request** · si toca calidad, seguridad o
+arquitectura, revisa además el rol responsable · se hizo el commit · el issue fue
+actualizado o cerrado.
 
 La revisión cruzada no es opcional: es la razón por la que existe el flujo de PRs.
 

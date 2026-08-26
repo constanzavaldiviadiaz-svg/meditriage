@@ -4,8 +4,16 @@ Misión: Crear una herramienta que ayude a ordenar y priorizar pacientes usando 
 
 ## Integrantes y roles
 
-Constanza: Product Owner + QA Lead   
-Fernando: Tech Lead + DevSecOps Lead 
+| Integrante | Rol | Responsabilidad |
+|---|---|---|
+| Constanza Valdivia | Product Owner | Define qué se va a construir y en qué orden de importancia. Escribe y prioriza el backlog. |
+| Fernando Ureta | Tech Lead · AI/Data Lead | Define cómo se construye el software a nivel técnico y guía al equipo. Custodio de la arquitectura y los ADR. Responsable de las funcionalidades de IA y sus métricas. |
+| Matías Sepúlveda | DevSecOps Lead | Automatiza la entrega del software de forma rápida, estable y segura. Responsable de los pipelines, la seguridad y la observabilidad. |
+| Matías Casa | QA Lead | Asegura que el software funcione correctamente y sin errores. Responsable de la estrategia de pruebas y de los criterios de aceptación. |
+
+El ramo define cinco roles y el equipo son cuatro personas. Fernando asume además el rol de
+AI/Data Lead, porque en MediTriage las decisiones de arquitectura y las del modelo de IA
+están demasiado ligadas como para separarlas.
 
 ## Valores
 
@@ -63,7 +71,8 @@ Una tarea está terminada cuando:
 
 * Cumple con lo solicitado.
 * Fue probada.
-* Fue revisada por el otro integrante.
+* Fue revisada y aprobada por al menos otro integrante, mediante Pull Request.
+* Si el cambio afecta a un área con responsable —calidad, seguridad o arquitectura—, revisa
+  además quien tiene ese rol.
 * Se realizó el commit correspondiente.
 * El Issue fue actualizado o cerrado.
-
