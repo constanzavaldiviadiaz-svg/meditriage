@@ -47,3 +47,11 @@
 **para** consultar el historial.
 
 **Prioridad:** Won't
+
+---
+
+## Discovery
+
+**Técnica:** Entrevista
+
+Se identificaron las necesidades del personal de salud para definir las historias de usuario.
