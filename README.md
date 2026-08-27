@@ -22,3 +22,7 @@ Crear un sistema que permita ingresar información de un paciente y entregar una
 
 * [Charter](CHARTER.md)
 * [ADR 0001 — Elección de iniciativa](docs/adr/0001-eleccion-iniciativa.md)
+
+## Flujo de trabajo
+
+Las convenciones de ramas, commits y Pull Requests del equipo se encuentran documentadas en [CLAUDE.md](CLAUDE.md).
