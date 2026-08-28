@@ -26,3 +26,5 @@ Crear un sistema que permita ingresar información de un paciente y entregar una
 ## Flujo de trabajo
 
 Las convenciones de ramas, commits y Pull Requests del equipo se encuentran documentadas en [CLAUDE.md](CLAUDE.md).
+
+La rama `main` requiere Pull Request y aprobación antes de integrar cambios.
