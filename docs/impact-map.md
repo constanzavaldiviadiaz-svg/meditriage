@@ -8,20 +8,22 @@ Se mide como el tiempo transcurrido entre que el paciente entrega sus síntomas 
 vitales, y queda con una categoría ESI asignada y validada por la enfermera de triage.
 
 La cifra de 25 minutos es la línea base del proceso manual actual descrito en el contexto de
-negocio de la iniciativa.
+negocio de la iniciativa. No proviene de una medición hecha por el equipo.
 
 ## Actores
 
-Dos actores clave, ambos con historias asociadas en el backlog:
+Tres actores, todos con historias asociadas en el [backlog](backlog.md):
 
-| Actor | Por qué es clave |
-|---|---|
-| **Enfermera de triage** | Es quien ejecuta hoy la priorización manual. Es el actor cuyo cambio de comportamiento produce directamente el ahorro de tiempo del objetivo. |
-| **Auditor clínico** | El enunciado exige que cada decisión de IA quede registrada e inmutable por 5 años. Sin este actor, la trazabilidad no tiene destinatario. |
+| Actor | Por qué es clave | Historias |
+|---|---|---|
+| **Enfermera de triage** | Ejecuta hoy la priorización manual. Es el actor cuyo cambio de comportamiento produce directamente el ahorro de tiempo del objetivo. | HU01, HU02, HU03, HU06 |
+| **Médico jefe de turno** | Gestiona la sala de espera completa. Su decisión de a quién atender primero depende de que la priorización esté visible y actualizada. | HU04 |
+| **Auditor clínico** | El enunciado exige que cada decisión de IA quede registrada e inmutable por 5 años. Sin este actor, la trazabilidad no tiene destinatario. | HU05 |
 
-El **paciente** y el **médico jefe de turno** aparecen en el contexto de la iniciativa, pero
-no se incluyen como actores de este mapa: en el alcance actual no cambian su comportamiento
-ni tienen historias asociadas. Se incorporarán cuando exista una historia que los involucre.
+El **paciente** aparece en el contexto de la iniciativa, pero no se incluye como actor de
+este mapa: en el alcance actual no cambia su comportamiento —entrega sus síntomas igual que
+antes— ni opera el sistema. Se incorporará cuando exista una historia que lo involucre
+directamente.
 
 ## Impactos
 
@@ -31,10 +33,13 @@ Un impacto es un **cambio de comportamiento en un actor**, no una función del s
 
 - **Deja de evaluar desde cero**: pasa a validar una sugerencia ESI ya justificada, en unos
   30 segundos, en lugar de construir la evaluación completa.
-- **Deja de reordenar la sala de espera manualmente**: la lista de pacientes se reordena sola
-  a medida que ingresan casos más graves.
 - **Deja de quedarse esperando cuando el sistema falla**: si el motor de IA no responde
   dentro de 3 segundos, el caso se enruta a triage manual y ella sigue trabajando.
+
+### Médico jefe de turno
+
+- **Deja de reordenar la sala de espera manualmente**: la lista se reordena sola a medida que
+  ingresan casos más graves o se reevalúa a un paciente.
 
 ### Auditor clínico
 
@@ -48,38 +53,35 @@ impacto, se elimina.
 
 | Entregable | Impacto al que sirve | Historia |
 |---|---|---|
-| Formulario de síntomas y signos vitales, con validación de RUT | Habilita que la enfermera deje de evaluar desde cero | HU01 |
+| Registro del paciente con validación de RUT y consentimiento informado | Permite iniciar la atención de forma legal, sin trámite paralelo | HU01 |
+| Formulario de síntomas y captura de signos vitales | Habilita que la enfermera deje de evaluar desde cero | HU01 |
 | Motor de sugerencia de categoría ESI (1–5) | La enfermera valida en vez de evaluar | HU02 |
 | Justificación explicable de cada sugerencia | Sin justificación la enfermera no puede validar: volvería a evaluar desde cero | HU03 |
-| Tablero de pacientes ordenados por prioridad | La enfermera deja de reordenar la sala manualmente | HU04 |
-| Audit log consultable de cada recomendación | El auditor deja de pedir datos a terceros | HU05 |
-| Derivación automática a triage manual ante fallo o demora | La enfermera no queda bloqueada cuando el sistema falla | *sin historia* |
+| Tablero de pacientes ordenados por categoría ESI, con actualización dinámica | El médico jefe deja de reordenar la sala manualmente | HU04 |
+| Audit log consultable e inmutable de cada recomendación | El auditor deja de pedir datos a terceros | HU05 |
+| Derivación automática a triage manual ante fallo o demora mayor a 3 segundos | La enfermera no queda bloqueada cuando el sistema falla | HU06 |
 
 ## Trazabilidad: del objetivo a la historia
 
 | Historia | Entregable | Impacto | Contribución al objetivo |
 |---|---|---|---|
-| HU01 Registrar información del paciente | Formulario validado | Captura estructurada en lugar de anotación libre | Elimina la transcripción manual previa |
-| HU02 Obtener prioridad | Motor de sugerencia ESI | Validar en 30 s en vez de evaluar desde cero | Es el ahorro principal: de 25 min a menos de 3 |
-| HU03 Ver explicación | Justificación explicable | Permite validar rápido y con confianza | Sin esto, HU02 no reduce el tiempo real |
-| HU04 Ver pacientes priorizados | Tablero priorizado | No reordenar la sala a mano | Reduce el tiempo entre pacientes |
-| HU05 Revisar historial | Audit log | El auditor se autoatiende | No reduce el tiempo, pero es requisito legal del MVP |
+| **HU01** Registrar al paciente y capturar sus datos clínicos | Registro validado + formulario de síntomas y signos vitales | Captura estructurada en lugar de anotación libre | Elimina la transcripción manual previa |
+| **HU02** Obtener una sugerencia de categoría ESI | Motor de sugerencia ESI | Validar en 30 s en vez de evaluar desde cero | Es el ahorro principal: de 25 min a menos de 3 |
+| **HU03** Ver la justificación de la sugerencia | Justificación explicable | Permite validar rápido y con confianza clínica | Sin esto, HU02 no reduce el tiempo real |
+| **HU04** Ver el tablero de pacientes priorizados | Tablero dinámico | El médico jefe no reordena la sala a mano | Reduce el tiempo muerto entre pacientes |
+| **HU05** Auditar las recomendaciones realizadas | Audit log consultable | El auditor se autoatiende | No reduce el tiempo, pero es requisito legal del MVP |
+| **HU06** Derivar a triage manual cuando el sistema no responde | Derivación automática ante fallo o demora | La enfermera no queda bloqueada | Protege el objetivo: sin esto, un fallo devuelve el proceso a los 25 minutos |
 
-## Observaciones para el equipo
+## Supuestos pendientes de validación
 
-1. **HU05 no debería estar priorizada como "Won't".** El MVP del enunciado incluye
-   trazabilidad y audit log de cada recomendación, y la restricción de ingeniería exige que
-   cada decisión quede registrada e inmutable por 5 años. Marcarla fuera de alcance
-   contradice el enunciado.
+El [Discovery](backlog.md#discovery) identificó seis supuestos mediante Assumption Mapping.
+Los tres de riesgo alto y sin evidencia afectan directamente a este mapa:
 
-2. **HU03 debería ser "Must", no "Should".** La explicabilidad es una restricción de
-   ingeniería obligatoria del enunciado, y además es la que hace que HU02 sirva de algo: sin
-   justificación, la enfermera vuelve a evaluar desde cero y el ahorro de tiempo desaparece.
+- **S1** — que la enfermera acepte validar una sugerencia de IA en vez de evaluar por su
+  cuenta. Si no ocurre, el impacto principal no se produce y el objetivo no se alcanza.
+- **S2** — que la justificación generada sea comprensible para personal clínico sin formación
+  técnica.
+- **S3** — que el consentimiento informado pueda obtenerse antes de atender una urgencia
+  grave.
 
-3. **Falta una historia para la derivación a triage manual.** Es el único entregable de este
-   mapa sin historia asociada, y responde a una restricción explícita del enunciado: la
-   respuesta debe llegar en menos de 3 segundos. Aplicando la regla de oro, o se crea la
-   historia o se elimina el entregable.
-
-4. **HU02 no cumple INVEST.** "Obtener el nivel de prioridad" es el motor de IA completo en
-   una sola historia: no es pequeña ni estimable sin un modelo definido. Debería partirse.
+Mientras no se validen, el ahorro de 25 a 3 minutos es una hipótesis, no una proyección.
