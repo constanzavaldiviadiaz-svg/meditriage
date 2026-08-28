@@ -54,9 +54,8 @@ impacto, se elimina.
 | Entregable | Impacto al que sirve | Historia |
 |---|---|---|
 | Registro del paciente con validación de RUT y consentimiento informado | Permite iniciar la atención de forma legal, sin trámite paralelo | HU01 |
-| Formulario de síntomas y captura de signos vitales | Habilita que la enfermera deje de evaluar desde cero | HU01 |
-| Motor de sugerencia de categoría ESI (1–5) | La enfermera valida en vez de evaluar | HU02 |
-| Justificación explicable de cada sugerencia | Sin justificación la enfermera no puede validar: volvería a evaluar desde cero | HU03 |
+| Formulario de síntomas y captura de signos vitales | Habilita que la enfermera deje de evaluar desde cero | HU02 |
+| Motor de sugerencia de categoría ESI (1–5) con su justificación explicable | La enfermera valida en vez de evaluar. Sin justificación volvería a evaluar desde cero | HU03 |
 | Tablero de pacientes ordenados por categoría ESI, con actualización dinámica | El médico jefe deja de reordenar la sala manualmente | HU04 |
 | Audit log consultable e inmutable de cada recomendación | El auditor deja de pedir datos a terceros | HU05 |
 | Derivación automática a triage manual ante fallo o demora mayor a 3 segundos | La enfermera no queda bloqueada cuando el sistema falla | HU06 |
@@ -65,9 +64,9 @@ impacto, se elimina.
 
 | Historia | Entregable | Impacto | Contribución al objetivo |
 |---|---|---|---|
-| **HU01** Registrar al paciente y capturar sus datos clínicos | Registro validado + formulario de síntomas y signos vitales | Captura estructurada en lugar de anotación libre | Elimina la transcripción manual previa |
-| **HU02** Obtener una sugerencia de categoría ESI | Motor de sugerencia ESI | Validar en 30 s en vez de evaluar desde cero | Es el ahorro principal: de 25 min a menos de 3 |
-| **HU03** Ver la justificación de la sugerencia | Justificación explicable | Permite validar rápido y con confianza clínica | Sin esto, HU02 no reduce el tiempo real |
+| **HU01** Registrar al paciente con consentimiento informado | Registro con validación de RUT y consentimiento | Permite iniciar la atención sin trámite paralelo en papel | Elimina la admisión manual previa |
+| **HU02** Capturar síntomas y signos vitales | Formulario validado de síntomas y signos vitales | Captura estructurada en lugar de anotación libre | Elimina la transcripción manual de los datos clínicos |
+| **HU03** Obtener una sugerencia de categoría ESI con su justificación | Motor de sugerencia ESI con explicación | Validar en 30 s en vez de evaluar desde cero | Es el ahorro principal: de 25 min a menos de 3 |
 | **HU04** Ver el tablero de pacientes priorizados | Tablero dinámico | El médico jefe no reordena la sala a mano | Reduce el tiempo muerto entre pacientes |
 | **HU05** Auditar las recomendaciones realizadas | Audit log consultable | El auditor se autoatiende | No reduce el tiempo, pero es requisito legal del MVP |
 | **HU06** Derivar a triage manual cuando el sistema no responde | Derivación automática ante fallo o demora | La enfermera no queda bloqueada | Protege el objetivo: sin esto, un fallo devuelve el proceso a los 25 minutos |
