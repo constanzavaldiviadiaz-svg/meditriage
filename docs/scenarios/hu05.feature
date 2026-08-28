@@ -1,16 +1,22 @@
-Feature: Revisar historial
+Feature: Registro inmutable y auditoria de decisiones
+  Como auditor clinico
+  Quiero consultar el historial inmutable de las decisiones de triage
+  Para evaluar el cumplimiento de protocolos y respaldar auditorias legales
 
-  Scenario: Revisar recomendaciones realizadas
-    Given que existen recomendaciones registradas
-    When el auditor revisa el historial
-    Then puede ver las recomendaciones realizadas
+  Scenario: Consulta de trazabilidad completa de una evaluacion
+    Given un proceso de triage finalizado hace 6 meses
+    When el auditor clinico busca el registro mediante el identificador unico
+    Then el sistema muestra los datos ingresados, sugerencia ESI, decision final y explicacion
+    And confirma la firma digital de inmutabilidad del audit log
 
-  Scenario: Revisar una recomendación por fecha
-    Given que existe una recomendación registrada
-    When el auditor revisa el historial
-    Then puede ver la fecha de la recomendación
+  Scenario: Filtrado de auditoria por rango de fechas extenso
+    Given un volumen de 50.000 registros almacenados en el ultimo ano
+    When el auditor clinico aplica un filtro por rango de fechas de los ultimos 3 meses
+    Then el sistema entrega la lista filtrada resguardando la enmascaracion de PII
+    And exporta el reporte manteniendo los registros de integridad
 
-  Scenario: No existen recomendaciones
-    Given que no existen recomendaciones registradas
-    When el auditor revisa el historial
-    Then el sistema indica que no hay registros
+  Scenario: Intento de consulta sin credenciales o permisos de auditoria
+    Given un usuario autenticado con rol de enfermera de triage
+    When intenta acceder al modulo de consulta inmutable del audit log
+    Then el sistema deniega el acceso por falta de privilegios
+    And registra el intento de acceso no autorizado en el log de seguridad
