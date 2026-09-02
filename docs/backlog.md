@@ -5,6 +5,9 @@ Historias extraídas del [Impact Map](impact-map.md). Cada una traza hasta el ob
 
 Cada historia tiene sus criterios de aceptación en el archivo `.feature` del mismo número.
 
+La trazabilidad de cada historia hasta el objetivo está en la tabla del
+[Impact Map](impact-map.md#trazabilidad-del-objetivo-a-la-historia).
+
 ---
 
 ## HU01 — Registrar al paciente con consentimiento informado
@@ -124,6 +127,73 @@ Decisiones explícitas de no construir, para acotar el alcance:
   datos sensibles que exceden esta entrega.
 
 ---
+
+---
+
+## Checklist INVEST
+
+Cada historia se revisó contra las seis condiciones. Se documentan también las que **no**
+cumplen: una historia con una debilidad conocida y una decisión asociada es más útil que una
+lista donde todo aparece perfecto.
+
+| Historia | I | N | V | E | S | T |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| HU01 Registro con consentimiento | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| HU02 Síntomas y signos vitales | ⚠️ | ✅ | ⚠️ | ✅ | ✅ | ✅ |
+| HU03 Sugerencia ESI con justificación | ⚠️ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| HU04 Tablero priorizado | ⚠️ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| HU05 Auditoría de recomendaciones | ⚠️ | ✅ | ✅ | ⚠️ | ❌ | ✅ |
+| HU06 Derivación a triage manual | ⚠️ | ✅ | ✅ | ⚠️ | ✅ | ✅ |
+
+✅ cumple · ⚠️ cumple con reservas · ❌ no cumple
+
+### Lo que no cumple, y qué decidimos
+
+**Independent — es la letra más débil de todo el backlog.**
+Existe una cadena natural: no se pueden tomar signos vitales de un paciente sin registrar, ni
+sugerir una categoría ESI sin datos clínicos. Los propios escenarios lo reflejan: `hu02`
+empieza con *"Given un paciente previamente registrado"*.
+
+*Decisión:* se acepta. En INVEST, "Independent" apunta a evitar acoplamientos arbitrarios que
+obliguen a entregar varias historias juntas, no a negar un orden lógico del dominio. Cada
+historia se puede desarrollar y demostrar por separado usando datos de prueba.
+
+**HU03 — no es Estimable ni Small.**
+Concentra el motor de IA completo. No se puede estimar su esfuerzo sin saber qué modelo se
+usará ni con qué datos, y no cabe en dos o tres días.
+
+*Decisión:* no se parte todavía. Dividirla hoy sería inventar una separación sin base
+técnica: el stack no está decidido y la arquitectura se define en la S03. Queda marcada como
+candidata a partirse en la planificación del sprint, una vez tomada esa decisión.
+
+**HU05 — no es Small, y su estimación es dudosa.**
+Mezcla dos cosas de tamaño muy distinto: el registro inmutable con retención de 5 años, que
+es infraestructura, y la pantalla donde el auditor consulta.
+
+*Decisión:* se parte cuando se defina el almacenamiento, en la S06. El registro inmutable es
+Must y ya está como criterio de aceptación de HU03; lo priorizado aquí como Should es la
+pantalla de consulta.
+
+**HU06 — Estimable con reservas.**
+Depende del mismo motor de IA no definido de HU03, aunque su alcance sí es pequeño.
+
+*Decisión:* se acepta. El comportamiento a construir —cortar la espera a los 3 segundos y
+derivar— es claro aunque el motor todavía no exista.
+
+**HU02 — Valuable con reservas.**
+Capturar síntomas sin que nadie los evalúe aporta poco por sí solo; su valor se realiza junto
+con HU03.
+
+*Decisión:* se mantiene separada. Elimina la transcripción manual duplicada, que es un
+beneficio propio, y unirla a HU03 haría esa historia todavía más grande.
+
+### Lo que sí cumple sin reservas
+
+**Testable es la letra más fuerte: 6 de 6.** Las seis historias tienen tres escenarios Gherkin
+cada una —caso feliz, borde y error— en `docs/scenarios/`. Son 18 criterios verificables.
+
+**Negotiable también, 6 de 6.** Ninguna historia está redactada como especificación cerrada:
+todas describen una capacidad y un beneficio, dejando abierto el cómo.
 
 ## Discovery
 
