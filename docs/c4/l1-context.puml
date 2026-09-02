@@ -7,8 +7,12 @@ actor "Auditor clínico" as auditor
 
 rectangle "MediTriage" as meditriage
 
+rectangle "Registro Civil" as registro
+
 enfermera --> meditriage : Registra pacientes y\nvalida la prioridad ESI
 medico --> meditriage : Consulta pacientes\npriorizados
 auditor --> meditriage : Consulta historial de\nrecomendaciones
+
+meditriage --> registro : Valida RUT del paciente
 
 @enduml
