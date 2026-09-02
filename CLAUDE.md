@@ -56,17 +56,19 @@ Los límites importan:
 
 ## Flujo de trabajo con Git
 
-`main` es la rama protegida. **Nadie commitea directo a main, ni la dueña del repo.**
+**La fuente canónica es [CONTRIBUTING.md](CONTRIBUTING.md).** Si algo aquí difiere de ese
+archivo, manda CONTRIBUTING.md. Resumen para no tener que abrirlo en cada tarea:
 
-Ramas: `tipo/N-descripcion-corta`, donde `N` es el número del issue de GitHub.
-Prefijos: `feat/` · `fix/` · `docs/` · `chore/`.
-
-Un issue = una rama = un PR. El PR cierra el issue con `Closes #N` en el cuerpo.
-Merge con **squash**, borrando la rama. Nunca `force-push` a `main`.
+- `main` es rama protegida: nadie commitea directo, ni la dueña del repo.
+- Un issue = una rama = un PR. Ramas: `tipo/N-descripcion`, con `N` el número del issue.
+  Prefijos: `feat/` `fix/` `docs/` `chore/`.
+- El cuerpo del PR lleva `Closes #N` **en inglés**: en español GitHub no lo reconoce y el
+  issue queda abierto.
+- Merge con squash, borrando la rama. Nunca `force-push` a `main`.
+- No fusionar el propio PR: la revisión de otro integrante es parte del Definition of Done.
 
 Constanza trabaja desde el **editor web de GitHub**, no clona el repo. Cualquier propuesta de
-flujo debe seguir siendo posible desde la web ("Create a new branch for this commit and start
-a pull request").
+flujo debe seguir siendo posible desde la web.
 
 ## Commits
 
