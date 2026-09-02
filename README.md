@@ -1,9 +1,12 @@
+# MediTriage — Triage clínico asistido por IA
 
-## Iniciativa
+Sistema que utiliza inteligencia artificial para ayudar a ordenar y priorizar pacientes según
+sus síntomas y signos vitales, en la sala de espera de centros de atención primaria.
 
-**MediTriage — Triage clínico asistido por IA**
+## Objetivo
 
-Sistema que utiliza inteligencia artificial para ayudar a ordenar y priorizar pacientes según sus síntomas y signos vitales.
+Reducir el tiempo de priorización del triage de 25 minutos a menos de 3 minutos, entregando a
+la enfermera una sugerencia de categoría ESI (1 a 5) acompañada de su justificación.
 
 ## Equipo
 
@@ -14,17 +17,26 @@ Sistema que utiliza inteligencia artificial para ayudar a ordenar y priorizar pa
 | Matías Sepúlveda | DevSecOps Lead |
 | Matías Casa | QA Lead |
 
-## Objetivo
-
-Crear un sistema que permita ingresar información de un paciente y entregar una recomendación de prioridad mediante IA.
-
 ## Documentación
 
-* [Charter](CHARTER.md)
+**Acuerdos del equipo**
+
+* [CHARTER](CHARTER.md) — misión, roles, valores, política de uso de IA y Definition of Done
+* [CONTRIBUTING](CONTRIBUTING.md) — cómo se contribuye: ramas, commits y Pull Requests
+
+**Requisitos y producto**
+
+* [Impact Map](docs/impact-map.md) — objetivo, actores, impactos, entregables y trazabilidad
+* [Backlog](docs/backlog.md) — historias de usuario, priorización MoSCoW y checklist INVEST
+* [Escenarios Gherkin](docs/scenarios/) — criterios de aceptación, un archivo por historia
+
+**Decisiones de arquitectura**
+
 * [ADR 0001 — Elección de iniciativa](docs/adr/0001-eleccion-iniciativa.md)
 
 ## Flujo de trabajo
 
-Las convenciones de ramas, commits y Pull Requests del equipo se encuentran documentadas en [CLAUDE.md](CLAUDE.md).
+Las convenciones de ramas, commits y Pull Requests están en [CONTRIBUTING.md](CONTRIBUTING.md).
 
-La rama `main` requiere Pull Request y aprobación antes de integrar cambios.
+La rama `main` requiere Pull Request y aprobación de otro integrante antes de integrar
+cambios.
