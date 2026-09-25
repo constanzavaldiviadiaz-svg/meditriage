@@ -30,9 +30,12 @@ la enfermera una sugerencia de categoría ESI (1 a 5) acompañada de su justific
 * [Backlog](docs/backlog.md) — historias de usuario, priorización MoSCoW y checklist INVEST
 * [Escenarios Gherkin](docs/scenarios/) — criterios de aceptación, un archivo por historia
 
-**Decisiones de arquitectura**
+**Arquitectura**
 
 * [ADR 0001 — Elección de iniciativa](docs/adr/0001-eleccion-iniciativa.md)
+* [ADR 0002 — Elección del estilo arquitectónico](docs/adr/0002-estilo-arquitectonico.md)
+* [Diagramas C4](docs/c4/) — contexto (nivel 1) y contenedores (nivel 2)
+* [Atributos de calidad](docs/arch/atributos-calidad.md) — los 3 NFRs prioritarios
 
 ## Flujo de trabajo
 

@@ -8,7 +8,7 @@ MediTriage — Triage clínico asistido por IA. Proyecto del ramo **Taller de In
 Software** (18 sesiones). No es un repo de producto: es un repo académico donde **cada
 sesión de clase aporta un artefacto entregable**, evaluado con rúbrica.
 
-**Sesión vigente: S02.** La S01 fue entregada y aprobada por el docente. No adelantarse a sesiones que el equipo aún no ha cursado: crear
+**Sesión vigente: S03** (arquitectura y modelo C4). La S01 y la S02 fueron entregadas. No adelantarse a sesiones que el equipo aún no ha cursado: crear
 artefactos de sesiones futuras desordena la cronología del repo y contradice la política de
 IA del ramo. Actualizar esta línea al avanzar de sesión.
 
@@ -44,7 +44,7 @@ explica el porqué · tablero para personal médico con priorización dinámica 
   única con permiso de admin, así que branch protection, settings y colaboradores son suyos.
 - **Fernando Ureta** (`fernandoureta`) — Tech Lead + AI/Data Lead. Colaborador.
 - **Matías Sepúlveda** (`ByRetro`) — DevSecOps Lead. Colaborador.
-- **Matías Casa** — QA Lead. **Todavía no agregado como colaborador del repositorio.**
+- **Matías Casa** (`redskull5`) — QA Lead. Colaborador.
 
 Los límites importan:
 
@@ -87,12 +87,35 @@ La revisión cruzada no es opcional: es la razón por la que existe el flujo de 
 
 ## Convenciones de documentación
 
-- `docs/adr/NNNN-titulo.md` — Architecture Decision Records. Formato exigido por la rúbrica:
-  **Título · Contexto · Decisión · Consecuencias · Fecha · Autores**. Numeración correlativa.
+- `docs/adr/NNNN-titulo.md` — Architecture Decision Records. **Formato desde la S03**:
+  **Título · Estado · Contexto · Decisión · Consecuencias · Alternativas descartadas**.
+  Estado toma uno de: Propuesto · Aceptado · Reemplazado · Deprecado.
+  El ADR 0001 usa el formato anterior de la S01, sin Estado ni Alternativas: **no se corrige**.
+- `docs/c4/` — diagramas C4. Fuente `.puml` con la librería C4 (`!include <C4/C4_Context>`)
+  más el `.png` exportado. Se entregan los niveles 1 y 2; el 3 solo para componentes críticos.
+- `docs/arch/` — atributos de calidad y documentación de arquitectura.
+- `docs/backlog.md`, `docs/impact-map.md`, `docs/scenarios/*.feature` — requisitos (S02).
 - Documentación en español.
 
-Las convenciones de los artefactos de cada sesión (backlog, diagramas, pipelines) se agregan
-aquí **cuando esa sesión llegue**, no antes.
+**Un ADR nunca se edita.** Si una decisión cambia, el anterior se marca como *Reemplazado* y
+se escribe uno nuevo.
+
+Para renderizar un `.puml` a PNG sin instalar nada:
+`curl -o salida.png "http://www.plantuml.com/plantuml/png/~h$(xxd -p archivo.puml | tr -d '\n')"`
+
+## Decisiones de arquitectura vigentes
+
+Del [ADR 0002](docs/adr/0002-estilo-arquitectonico.md):
+
+- **Monolito modular** en cuatro módulos: Registro, Evaluación, Tablero y Auditoría.
+- **El motor de IA es un servicio externo** consumido vía API. No se entrena modelo propio.
+- **La escritura del audit log es asíncrona**, para no consumir el presupuesto de 3 segundos.
+
+Consecuencias que condicionan cualquier diseño posterior:
+
+- La latencia depende de un tercero, así que **HU06 (derivación a triage manual) es obligatoria**.
+- Al servicio de IA **nunca se le envían RUT ni nombre**, solo datos clínicos despersonalizados.
+- Las respuestas no son deterministas: el audit log guarda la respuesta exacta entregada.
 
 ## Roadmap del ramo
 
