@@ -1,0 +1,43 @@
+@startuml l2-container
+!include <C4/C4_Container>
+
+title MediTriage — C4 Nivel 2: Diagrama de Contenedores
+
+Person(enfermera, "Enfermera de triage", "Registra al paciente y valida la categoría ESI sugerida")
+Person(medico, "Médico jefe de turno", "Gestiona la sala de espera")
+Person(auditor, "Auditor clínico", "Verifica el cumplimiento de las decisiones")
+
+System_Boundary(meditriage, "MediTriage") {
+  Container(web, "Aplicación web", "Python · FastAPI + Jinja2", "Sirve la interfaz y contiene los módulos Registro, Evaluación, Tablero y Auditoría. Despliegue único.")
+  ContainerDb(db, "Base de datos clínica", "PostgreSQL", "Pacientes, consentimientos, signos vitales y evaluaciones. Cifrada en reposo.")
+  ContainerQueue(cola, "Cola de auditoría", "Redis", "Desacopla el registro de la decisión de la respuesta al usuario.")
+  Container(worker, "Worker de auditoría", "Python", "Consume la cola y persiste cada decisión de forma inmutable.")
+  ContainerDb(audit, "Almacén de auditoría", "PostgreSQL · tabla append-only", "Registro inmutable de cada decisión de IA. Retención de 5 años.")
+}
+
+System_Ext(ia, "Servicio de IA", "API externa que sugiere la categoría ESI y genera su justificación")
+System_Ext(registro, "Registro Civil", "Validación de identidad y RUT")
+
+Rel(enfermera, web, "Registra pacientes y valida la prioridad ESI", "HTTPS")
+Rel(medico, web, "Consulta el tablero priorizado", "HTTPS")
+Rel(auditor, web, "Consulta el historial de recomendaciones", "HTTPS")
+
+Rel(web, db, "Lee y escribe datos clínicos", "SQL/TLS")
+Rel(web, registro, "Valida el RUT del paciente", "HTTPS")
+Rel(web, ia, "Envía síntomas y signos vitales despersonalizados / recibe categoría ESI y justificación", "HTTPS")
+Rel(web, cola, "Publica el evento de decisión", "Redis protocol")
+Rel(worker, cola, "Consume eventos", "Redis protocol")
+Rel(worker, audit, "Persiste la decisión de forma inmutable", "SQL/TLS")
+Rel(web, audit, "Lee el historial para el auditor", "SQL/TLS")
+
+note right of ia
+  Nunca se envían RUT ni nombre.
+  Solo datos clínicos despersonalizados
+  (Ley 19.628 y Ley 21.719).
+
+  Si no responde en 3 s, el caso
+  se deriva a triage manual (HU06).
+end note
+
+SHOW_LEGEND()
+@enduml
