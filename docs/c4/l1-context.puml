@@ -1,18 +1,29 @@
-@startuml
-title MediTriage - C4 Nivel 1: Contexto
+@startuml l1-context
+!include <C4/C4_Context>
 
-actor "Enfermera de triage" as enfermera
-actor "Médico jefe de turno" as medico
-actor "Auditor clínico" as auditor
+title MediTriage — C4 Nivel 1: Diagrama de Contexto
 
-rectangle "MediTriage" as meditriage
+Person(enfermera, "Enfermera de triage", "Registra al paciente y valida la categoría ESI sugerida")
+Person(medico, "Médico jefe de turno", "Gestiona la sala de espera y decide a quién atender primero")
+Person(auditor, "Auditor clínico", "Revisa el historial de decisiones para verificar cumplimiento")
 
-rectangle "Registro Civil" as registro
+System(meditriage, "MediTriage", "Prioriza pacientes en sala de espera sugiriendo una categoría ESI justificada")
 
-enfermera --> meditriage : Registra pacientes y\nvalida la prioridad ESI
-medico --> meditriage : Consulta pacientes\npriorizados
-auditor --> meditriage : Consulta historial de\nrecomendaciones
+System_Ext(registro, "Registro Civil", "Servicio de validación de identidad y RUT")
+System_Ext(ia, "Servicio de IA", "API externa que sugiere la categoría ESI y genera su justificación")
 
-meditriage --> registro : Valida RUT del paciente
+Rel(enfermera, meditriage, "Registra pacientes y valida la prioridad ESI")
+Rel(medico, meditriage, "Consulta pacientes priorizados")
+Rel(auditor, meditriage, "Consulta historial de recomendaciones")
 
+Rel(meditriage, registro, "Valida el RUT del paciente")
+Rel(meditriage, ia, "Envía síntomas y signos vitales / recibe categoría ESI y justificación", "HTTPS")
+
+note right of ia
+  No se envían RUT ni nombre.
+  Solo datos clínicos despersonalizados
+  (Ley 19.628 y Ley 21.719).
+end note
+
+SHOW_LEGEND()
 @enduml
