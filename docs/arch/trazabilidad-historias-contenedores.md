@@ -1,4 +1,3 @@
-# Trazabilidad historias ↔ contenedores (C4 nivel 2)
 ## Qué es
 
 Verificación de cobertura en las dos direcciones: cada historia del backlog debe tener al menos un contenedor que la implemente, y cada contenedor debe servir a al menos una historia. Es la misma lógica de la regla de oro del Impact Map, un nivel más abajo.
@@ -14,19 +13,21 @@ Un contenedor "implementa" una historia si es necesario para cumplir alguno de s
 | C3 | Cola de auditoría (Redis) | Desacopla el registro de la decisión de la respuesta al usuario |
 | C4 | Worker de auditoría | Consume la cola y persiste cada decisión |
 | C5 | Almacén de auditoría | Registro inmutable, retención de 5 años |
+| E1 | Servicio de IA (externo) | Sugiere la categoría ESI y genera la justificación |
+| E2 | Registro Civil (externo) | Validación de identidad y RUT |
 
-El Servicio de IA y el Registro Civil son sistemas externos: no cuentan como contenedores.
+Los cuatro módulos del ADR 0002 (Registro, Evaluación, Tablero y Auditoría) viven dentro de C1: no son contenedores separados. Por eso, al mapear una historia, el contenedor que la implementa es C1 más los almacenes o servicios que use. Entre paréntesis se indica el módulo.
 
 ## Tabla historia → contenedor
 
 | Historia | Contenedores que la implementan |
 |---|---|
-| HU01 Registro con consentimiento | C1 (Registro) · C2 · C3 · C4 · C5 · Registro Civil (ext.) |
+| HU01 Registro con consentimiento | C1 (Registro) · C2 · C3 · C4 · C5 · E2 |
 | HU02 Síntomas y signos vitales | C1 (Evaluación) · C2 |
-| HU03 Sugerencia ESI con justificación | C1 (Evaluación) · C2 · C3 · C4 · C5 · Servicio de IA (ext.) |
+| HU03 Sugerencia ESI con justificación | C1 (Evaluación) · C2 · C3 · C4 · C5 · E1 |
 | HU04 Tablero de pacientes priorizados | C1 (Tablero) · C2 |
 | HU05 Auditoría de recomendaciones | C1 (Auditoría) · C5 (lectura) · C3 · C4 (escritura) |
-| HU06 Derivación a triage manual | C1 (Evaluación) · C3 · C4 · C5 · Servicio de IA (ext.) |
+| HU06 Derivación a triage manual | C1 (Evaluación) · C3 · C4 · C5 · E1 |
 
 C3, C4 y C5 aparecen en HU01, HU03 y HU06 porque sus escenarios exigen registrar en el audit log.
 
@@ -39,6 +40,8 @@ C3, C4 y C5 aparecen en HU01, HU03 y HU06 porque sus escenarios exigen registrar
 | C3 Cola de auditoría | HU01 · HU03 · HU05 · HU06 |
 | C4 Worker de auditoría | HU01 · HU03 · HU05 · HU06 |
 | C5 Almacén de auditoría | HU01 · HU03 · HU05 · HU06 |
+| E1 Servicio de IA | HU03 · HU06 |
+| E2 Registro Civil | HU01 |
 
 ## Huecos
 
@@ -55,7 +58,7 @@ Se dejan señaladas para que el Tech Lead evalúe si corresponde representarlas 
 
 ### Contenedor sin historia
 
-Ninguno: todos sirven a al menos cuatro historias.
+Ninguno: los cinco contenedores propios sirven a al menos cuatro historias, y los dos externos sirven a al menos una (E1 a HU03 y HU06; E2 a HU01).
 
 Observación: C3, C4 y C5 no tienen una historia cuyo propósito principal sea el registro inmutable. Hoy se justifican por los criterios de aceptación de HU01, HU03 y HU06 y por la mitad de escritura de HU05, que está priorizada como *Should*. El backlog ya anticipa partir HU05 en la S06; se deja anotado para que, cuando eso ocurra, la PO considere si el registro inmutable necesita su propia historia.
 
@@ -84,4 +87,4 @@ Puntos donde las pruebas quedan acopladas:
 |---|---|
 | ¿Historias sin contenedor? | Ninguna. Dos capacidades sin dueño explícito: alerta a plataforma y autenticación/log de seguridad. |
 | ¿Contenedores sin historia? | Ninguno. C3, C4 y C5 dependen de criterios de aceptación y de HU05 (*Should*). |
-| ¿Testabilidad? | Buena por contenedor con interfaces. Acoplamientos: cadena de auditoría, plazos de HU06 y doble escritura. 
+| ¿Testabilidad? | Buena por contenedor con interfaces. Acoplamientos: cadena de auditoría, plazos de HU06 y doble escritura. |
