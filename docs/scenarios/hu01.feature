@@ -20,3 +20,10 @@ Feature: Registro de paciente y consentimiento informado
     When la enfermera de triage ingresa el RUT "12.345.678-K" con digito verificador erróneo
     Then el sistema rechaza el registro mostrando un mensaje de error de validacion
     And no se crea ninguna ficha de paciente en el sistema
+    
+  Scenario: Intento de registro sin consentimiento informado
+    Given un paciente consciente y en condiciones de otorgar consentimiento
+    When el paciente rechaza o no otorga el consentimiento informado
+    Then el sistema bloquea el registro y no permite continuar con el proceso de triage
+    And no se envia informacion clinica al motor de evaluacion
+    And el intento queda registrado en el audit log con cualquier PII enmascarada
