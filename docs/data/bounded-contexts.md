@@ -2,7 +2,7 @@
 
 ## 1. Alcance
 
-MediTriage se organiza mediante Bounded Contexts para separar las responsabilidades del dominio y mantener límites claros entre la información clínica, la identidad del paciente, la auditoría y la facturación.
+MediTriage se organiza mediante Bounded Contexts para separar las responsabilidades del dominio y mantener límites claros entre la información clínica, la identidad del paciente y la auditoría.
 
 Los cuatro contextos identificados son:
 
@@ -38,13 +38,13 @@ El contexto Clínico no necesita conocer directamente todos los datos de identid
 - Síntomas: manifestaciones reportadas por el paciente.
 - ESI: sistema utilizado para determinar la prioridad del paciente.
 - Triaje: proceso de evaluación y clasificación de prioridad.
-- Encounter: instancia clínica asociada a la atención del paciente.
+- Encuentro: instancia clínica asociada a la atención del paciente.
 
 ### Aggregate
 
-El Aggregate principal es `Encounter`.
+El Aggregate principal es `encuentro`.
 
-`Encounter` representa la instancia clínica en la que se registra y procesa la información necesaria para realizar el triaje.
+`encuentro` representa la instancia clínica en la que se registra y procesa la información necesaria para realizar el triaje.
 
 ---
 
@@ -126,39 +126,53 @@ Si en el futuro MediTriage incorpora funcionalidades de pagos o gestión de plan
 
 ## 6. Context Map
 
-La relación entre los contextos se puede representar de la siguiente manera:
+La relación entre los contextos internos y los sistemas externos se puede representar de la siguiente manera:
 
 ```text
-                 ┌─────────────────────┐
-                 │      IDENTIDAD      │
-                 │                     │
-                 │       Person        │
-                 └──────────┬──────────┘
-                            │
-                            │ identidad válida
-                            │ consentimiento
-                            ▼
-                 ┌─────────────────────┐
-                 │       CLÍNICO       │
-                 │                     │
-                 │      Encounter      │
-                 │                     │
-                 │     Triaje / ESI    │
-                 └──────────┬──────────┘
-                            │
-                            │ decisión clínica
-                            │ referencia opaca
-                            ▼
-                 ┌─────────────────────┐
-                 │      AUDITORÍA      │
-                 │                     │
-                 │      AuditLog       │
-                 └─────────────────────┘
+                         ┌─────────────────────┐
+                         │    REGISTRO CIVIL   │
+                         │       Externo       │
+                         └──────────┬──────────┘
+                                    │
+                                    │ validación
+                                    ▼
+                         ┌─────────────────────┐
+                         │     IDENTIDAD       │
+                         │                     │
+                         │       Person        │
+                         └──────────┬──────────┘
+                                    │
+                                    │ identidad válida
+                                    │ y consentimiento
+                                    ▼
+                         ┌─────────────────────┐
+                         │       CLÍNICO       │
+                         │                     │
+                         │      encuentro      │
+                         │                     │
+                         │     Triaje / ESI    │
+                         └──────────┬──────────┘
+                                    │
+                                    │ datos clínicos
+                                    │ sin identificadores
+                                    ▼
+                         ┌─────────────────────┐
+                         │    SERVICIO DE IA   │
+                         │       Externo       │
+                         └──────────┬──────────┘
+                                    │
+                                    │ sugerencia y
+                                    │ justificación
+                                    ▼
+                         ┌─────────────────────┐
+                         │      AUDITORÍA      │
+                         │                     │
+                         │      AuditLog       │
+                         └─────────────────────┘
 
 
-                 ┌─────────────────────┐
-                 │    FACTURACIÓN      │
-                 │                     │
-                 │ Fuera del alcance   │
-                 └─────────────────────┘
-```
+                         ┌─────────────────────┐
+                         │    FACTURACIÓN      │
+                         │                     │
+                         │  Fuera del alcance  │
+                         └─────────────────────┘
