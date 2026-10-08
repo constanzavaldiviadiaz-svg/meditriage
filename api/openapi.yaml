@@ -1,0 +1,1065 @@
+openapi: 3.1.0
+
+info:
+  title: MediTriage API
+  version: 1.0.0
+  summary: Triage clínico asistido por IA para centros de atención primaria.
+  description: |
+    API de MediTriage. Permite registrar pacientes con consentimiento informado, capturar sus
+    datos clínicos, obtener una sugerencia de categoría ESI (1 a 5) con su justificación,
+    consultar la sala de espera priorizada y auditar las decisiones registradas.
+
+    **Contract-first.** Este archivo es la fuente de verdad de la API. El código se escribe a
+    partir de él, no al revés.
+
+    **Errores.** Todas las respuestas de error usan el formato RFC 7807
+    (`application/problem+json`). El campo `type` identifica el problema de forma estable.
+
+    **Trazabilidad.** Toda respuesta incluye la cabecera `X-Trace-Id`. Permite seguir una
+    decisión a través de la aplicación, la cola y el worker de auditoría (factor 11 del
+    checklist 12-Factor).
+
+    **Datos sensibles.** La API maneja datos de salud bajo la Ley 19.628 y la Ley 21.719. Los
+    identificadores del paciente nunca salen hacia el servicio de IA externo, las respuestas
+    devuelven el RUT enmascarado, y el contexto de auditoría trabaja con referencias opacas.
+
+    **Versionado.** Ver `docs/api/versioning-policy.md`.
+  contact:
+    name: Equipo MediTriage
+    url: https://github.com/constanzavaldiviadiaz-svg/meditriage
+
+servers:
+  - url: http://localhost:8000
+    description: Desarrollo local
+  - url: https://staging.api.meditriage.example
+    description: Staging
+  - url: https://api.meditriage.example
+    description: Producción
+
+tags:
+  - name: Pacientes
+    description: Registro del paciente y su consentimiento informado (contexto de identidad).
+  - name: Encuentros
+    description: El episodio de atención de un paciente en la sala de espera (contexto clínico).
+  - name: Evaluación
+    description: Sugerencia de categoría ESI, derivación a triage manual y confirmación final.
+  - name: Sala de espera
+    description: Vista priorizada para el médico jefe de turno, con actualización en tiempo real.
+  - name: Auditoría
+    description: Historial inmutable de decisiones para el auditor clínico.
+
+paths:
+
+  /v1/pacientes:
+    post:
+      tags: [Pacientes]
+      operationId: registrarPaciente
+      summary: Registrar un paciente con su consentimiento informado
+      description: |
+        **HU01.** Registra al paciente validando su RUT y deja constancia de su consentimiento
+        informado.
+
+        - Si el paciente está inconsciente o imposibilitado de firmar, se admite la exención por
+          emergencia vital.
+        - Si el paciente consciente **rechaza** el consentimiento, el registro se bloquea con el
+          problema `consentimiento-no-otorgado`, y el intento queda en el audit log con la PII
+          enmascarada.
+        - Si el RUT ya está registrado, se responde `paciente-ya-registrado` con el identificador
+          existente.
+
+        La respuesta devuelve el RUT enmascarado: quien lo envió ya lo conoce y no hay razón
+        para volver a exponerlo.
+
+        **Actor:** enfermera de triage.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistroPacienteInput'
+      responses:
+        '201':
+          description: Paciente registrado.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Paciente'
+        '400':
+          $ref: '#/components/responses/SolicitudMalFormada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/AccesoDenegado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/ReglaIncumplida'
+
+  /v1/encuentros:
+    post:
+      tags: [Encuentros]
+      operationId: abrirEncuentro
+      summary: Abrir un encuentro de triage para un paciente
+      description: |
+        Abre el episodio de atención de un paciente ya registrado. Cada llegada a la sala de
+        espera es un encuentro nuevo; el paciente se registra una sola vez.
+
+        Separar paciente y encuentro sigue los bounded contexts del dominio: el paciente vive en
+        el contexto de identidad y el encuentro en el contexto clínico.
+
+        **Actor:** enfermera de triage.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AbrirEncuentroInput'
+      responses:
+        '201':
+          description: Encuentro abierto.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Encuentro'
+        '400':
+          $ref: '#/components/responses/SolicitudMalFormada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/AccesoDenegado'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+
+  /v1/encuentros/{encuentroId}/datos-clinicos:
+    put:
+      tags: [Encuentros]
+      operationId: registrarDatosClinicos
+      summary: Registrar los síntomas y signos vitales
+      description: |
+        **HU02.** Registra el motivo de consulta, los síntomas y los signos vitales del
+        encuentro.
+
+        Es un `PUT` porque reemplaza el conjunto completo de datos clínicos, y por lo tanto es
+        idempotente por definición: no requiere `Idempotency-Key`.
+
+        Si algún signo vital está en rango crítico, la respuesta incluye una alerta y permite
+        continuar con la evaluación inmediata. Si faltan datos obligatorios, se responde
+        `datos-clinicos-incompletos` y el caso no se envía al motor de evaluación.
+
+        **Actor:** enfermera de triage.
+      parameters:
+        - $ref: '#/components/parameters/EncuentroId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatosClinicosInput'
+      responses:
+        '200':
+          description: Datos clínicos registrados.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatosClinicos'
+        '400':
+          $ref: '#/components/responses/SolicitudMalFormada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/AccesoDenegado'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/ReglaIncumplida'
+
+  /v1/encuentros/{encuentroId}/evaluaciones:
+    post:
+      tags: [Evaluación]
+      operationId: solicitarEvaluacion
+      summary: Solicitar la sugerencia de categoría ESI
+      description: |
+        **HU03 y HU06.** Envía el encuentro al motor de IA y devuelve la categoría ESI sugerida
+        junto con su justificación.
+
+        El cuerpo es vacío: la evaluación se hace sobre los datos clínicos ya registrados en el
+        encuentro. **El servidor construye la solicitud al servicio de IA solo con datos
+        clínicos despersonalizados.** El RUT y el nombre nunca salen del sistema.
+
+        **Derivación a triage manual (HU06).** Si el motor de IA no responde dentro de 3
+        segundos, está caído, o devuelve una respuesta que no se puede interpretar, la respuesta
+        **no es un error**: es un resultado `derivado_triage_manual`, porque ese es el
+        comportamiento diseñado. La enfermera continúa sin esperar.
+
+        **Streaming.** Con `Accept: text/event-stream`, la respuesta se transmite por partes:
+        primero la categoría ESI y después la justificación a medida que se genera. Permite
+        priorizar antes de que la justificación esté completa.
+
+        Toda evaluación, exitosa o derivada, queda registrada en el audit log.
+
+        **Actor:** enfermera de triage.
+      parameters:
+        - $ref: '#/components/parameters/EncuentroId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: Evaluación registrada. Puede ser una sugerencia de la IA o una derivación a triage manual.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evaluacion'
+              examples:
+                sugerenciaIa:
+                  summary: El motor de IA respondió a tiempo
+                  value:
+                    evaluacionId: 7c1e2f3a-4b5d-4e6f-8a9b-0c1d2e3f4a5b
+                    encuentroId: 2b8f6d1c-9e4a-4f7b-8c3d-5a6e7f8091a2
+                    resultado: sugerencia_ia
+                    categoriaEsi: 2
+                    justificacion:
+                      resumen: Dolor torácico con presión arterial elevada y saturación limítrofe.
+                      factores:
+                        - factor: Dolor torácico
+                          descripcion: Síntoma de alto riesgo en el protocolo ESI.
+                        - factor: Presión arterial 182/112
+                          descripcion: Sobre el umbral de alerta.
+                    duracionMs: 1840
+                    generadaEn: '2026-10-08T14:22:31Z'
+                derivacionPorTimeout:
+                  summary: El motor de IA superó los 3 segundos
+                  value:
+                    evaluacionId: 9d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a
+                    encuentroId: 2b8f6d1c-9e4a-4f7b-8c3d-5a6e7f8091a2
+                    resultado: derivado_triage_manual
+                    motivo: timeout
+                    duracionMs: 3000
+                    generadaEn: '2026-10-08T14:22:34Z'
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Secuencia de eventos SSE. Primero `categoria` con la categoría ESI, después
+                  uno o más `justificacion` con fragmentos del texto, y finalmente `fin` con la
+                  evaluación completa. Si el motor falla, se emite un único evento `derivacion`.
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/AccesoDenegado'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/ReglaIncumplida'
+
+  /v1/encuentros/{encuentroId}/categoria-final:
+    put:
+      tags: [Evaluación]
+      operationId: confirmarCategoria
+      summary: Confirmar o modificar la categoría ESI
+      description: |
+        La enfermera, responsable clínica de la decisión, acepta la sugerencia o la modifica.
+
+        - Si la categoría final **difiere** de la sugerida por la IA, la justificación clínica
+          del cambio es obligatoria. Sin ella se responde `justificacion-requerida`.
+        - Si el caso fue derivado a triage manual, la enfermera asigna la categoría
+          directamente.
+
+        La sobreescritura y su motivo quedan registrados en el audit log.
+
+        **Actor:** enfermera de triage.
+      parameters:
+        - $ref: '#/components/parameters/EncuentroId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmacionInput'
+      responses:
+        '200':
+          description: Categoría final registrada.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoriaFinal'
+        '400':
+          $ref: '#/components/responses/SolicitudMalFormada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/AccesoDenegado'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/ReglaIncumplida'
+
+  /v1/sala-de-espera:
+    get:
+      tags: [Sala de espera]
+      operationId: consultarSalaDeEspera
+      summary: Consultar la sala de espera priorizada
+      description: |
+        **HU04.** Devuelve los pacientes en espera ordenados por categoría ESI, de la 1 a la 5,
+        y dentro de cada categoría por tiempo de espera.
+
+        Es una vista de lectura: no modifica nada. Para recibir los cambios en tiempo real sin
+        volver a consultar, usar `GET /v1/sala-de-espera/eventos`.
+
+        **Actor:** médico jefe de turno.
+      responses:
+        '200':
+          description: Sala de espera priorizada.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SalaDeEspera'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/AccesoDenegado'
+
+  /v1/sala-de-espera/eventos:
+    get:
+      tags: [Sala de espera]
+      operationId: suscribirSalaDeEspera
+      summary: Recibir los cambios de la sala de espera en tiempo real
+      description: |
+        **HU04, actualización dinámica.** Canal Server-Sent Events: el servidor empuja un evento
+        cada vez que un paciente ingresa, cambia de categoría o es atendido.
+
+        Se usa SSE y no WebSocket porque la comunicación es en un solo sentido: el tablero solo
+        lee. El navegador reconecta solo si se pierde la conexión, y mientras tanto el tablero
+        debe advertir que los datos pueden no estar actualizados.
+
+        **Actor:** médico jefe de turno.
+      responses:
+        '200':
+          description: Flujo de eventos de la sala de espera.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/EventoSalaDeEspera'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/AccesoDenegado'
+
+  /v1/auditoria/decisiones:
+    get:
+      tags: [Auditoría]
+      operationId: consultarDecisiones
+      summary: Consultar el historial de decisiones
+      description: |
+        **HU05.** Devuelve el historial inmutable de decisiones, filtrable por rango de fechas.
+
+        - **Paginación por cursor**, no por desplazamiento: con cinco años de retención el
+          historial crece sin límite, y el cursor mantiene un costo estable en cualquier página.
+        - **PII enmascarada:** el paciente aparece como referencia opaca, nunca con RUT ni
+          nombre. En el contexto de auditoría el paciente no es una persona, es una referencia a
+          decisiones registradas.
+        - Solo accesible con rol de auditor. Cualquier otro rol recibe `acceso-denegado`, y el
+          intento queda en el log de seguridad.
+
+        **Actor:** auditor clínico.
+      parameters:
+        - name: desde
+          in: query
+          required: false
+          description: Fecha y hora inicial del rango, inclusive.
+          schema:
+            type: string
+            format: date-time
+        - name: hasta
+          in: query
+          required: false
+          description: Fecha y hora final del rango, exclusive.
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limite'
+      responses:
+        '200':
+          description: Página de decisiones.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaDecisiones'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/AccesoDenegado'
+        '422':
+          $ref: '#/components/responses/ReglaIncumplida'
+
+  /v1/auditoria/decisiones/{decisionId}:
+    get:
+      tags: [Auditoría]
+      operationId: obtenerDecision
+      summary: Obtener una decisión con su verificación de integridad
+      description: |
+        **HU05.** Devuelve una decisión completa: la sugerencia de la IA o la derivación, la
+        categoría final, la justificación, y el hash de integridad que permite verificar que el
+        registro no fue modificado.
+
+        **Actor:** auditor clínico.
+      parameters:
+        - $ref: '#/components/parameters/DecisionId'
+      responses:
+        '200':
+          description: Decisión encontrada.
+          headers:
+            X-Trace-Id:
+              $ref: '#/components/headers/TraceId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decision'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/AccesoDenegado'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+
+components:
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Clave única generada por el cliente. Si la misma clave se repite con el mismo cuerpo,
+        se devuelve la respuesta original sin repetir la operación. Si se repite con un cuerpo
+        distinto, se responde `conflicto-idempotencia`. La respuesta se conserva 24 horas.
+      schema:
+        type: string
+        format: uuid
+    EncuentroId:
+      name: encuentroId
+      in: path
+      required: true
+      description: Identificador del encuentro.
+      schema:
+        type: string
+        format: uuid
+    DecisionId:
+      name: decisionId
+      in: path
+      required: true
+      description: Identificador de la decisión registrada.
+      schema:
+        type: string
+        format: uuid
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Cursor opaco devuelto por la página anterior. Se omite para la primera página.
+      schema:
+        type: string
+    Limite:
+      name: limite
+      in: query
+      required: false
+      description: Cantidad máxima de resultados por página.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+
+  headers:
+    TraceId:
+      description: Identificador de correlación de la solicitud. Viaja por la cola hasta el worker de auditoría.
+      schema:
+        type: string
+    Location:
+      description: URL del recurso creado.
+      schema:
+        type: string
+
+  schemas:
+
+    Rut:
+      type: string
+      description: RUT chileno con guion y dígito verificador.
+      pattern: '^\d{7,8}-[0-9Kk]$'
+
+    RutEnmascarado:
+      type: string
+      description: RUT con los dígitos centrales ocultos.
+      pattern: '^\d{1,2}\.\*{3}\.\*{3}-[0-9Kk]$'
+
+    CategoriaEsi:
+      type: integer
+      description: Categoría del Emergency Severity Index. 1 es la más urgente, 5 la menos.
+      minimum: 1
+      maximum: 5
+
+    RegistroPacienteInput:
+      type: object
+      required: [rut, nombre, consentimiento]
+      properties:
+        rut:
+          $ref: '#/components/schemas/Rut'
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 200
+        fechaNacimiento:
+          type: string
+          format: date
+        consentimiento:
+          $ref: '#/components/schemas/ConsentimientoInput'
+
+    ConsentimientoInput:
+      type: object
+      required: [estado]
+      properties:
+        estado:
+          type: string
+          enum: [otorgado, exencion_emergencia_vital, rechazado]
+          description: |
+            `exencion_emergencia_vital` se usa cuando el paciente no puede otorgarlo por su
+            estado. `rechazado` bloquea el registro, pero el intento queda auditado.
+        observacion:
+          type: string
+          maxLength: 500
+
+    Paciente:
+      type: object
+      required: [pacienteId, rutEnmascarado, consentimiento, registradoEn]
+      properties:
+        pacienteId:
+          type: string
+          format: uuid
+        rutEnmascarado:
+          $ref: '#/components/schemas/RutEnmascarado'
+        consentimiento:
+          type: object
+          required: [estado, registradoEn]
+          properties:
+            estado:
+              type: string
+              enum: [otorgado, exencion_emergencia_vital]
+            registradoEn:
+              type: string
+              format: date-time
+        registradoEn:
+          type: string
+          format: date-time
+
+    AbrirEncuentroInput:
+      type: object
+      required: [pacienteId]
+      properties:
+        pacienteId:
+          type: string
+          format: uuid
+
+    EstadoEncuentro:
+      type: string
+      enum: [abierto, en_espera, evaluado, derivado_triage_manual, confirmado, atendido]
+
+    Encuentro:
+      type: object
+      required: [encuentroId, pacienteId, estado, abiertoEn]
+      properties:
+        encuentroId:
+          type: string
+          format: uuid
+        pacienteId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoEncuentro'
+        abiertoEn:
+          type: string
+          format: date-time
+
+    SignosVitales:
+      type: object
+      required: [presionSistolica, presionDiastolica, frecuenciaCardiaca, temperatura, saturacionOxigeno]
+      properties:
+        presionSistolica:
+          type: integer
+          minimum: 40
+          maximum: 300
+          description: mmHg
+        presionDiastolica:
+          type: integer
+          minimum: 20
+          maximum: 200
+          description: mmHg
+        frecuenciaCardiaca:
+          type: integer
+          minimum: 20
+          maximum: 250
+          description: Latidos por minuto.
+        frecuenciaRespiratoria:
+          type: integer
+          minimum: 4
+          maximum: 80
+          description: Respiraciones por minuto.
+        temperatura:
+          type: number
+          minimum: 30
+          maximum: 45
+          description: Grados Celsius.
+        saturacionOxigeno:
+          type: integer
+          minimum: 50
+          maximum: 100
+          description: Porcentaje.
+
+    DatosClinicosInput:
+      type: object
+      required: [motivoConsulta, signosVitales]
+      properties:
+        motivoConsulta:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Síntoma principal que motiva la consulta.
+        sintomas:
+          type: array
+          items:
+            type: string
+            maxLength: 200
+        signosVitales:
+          $ref: '#/components/schemas/SignosVitales'
+
+    AlertaSignoVital:
+      type: object
+      required: [signo, valor, nivel]
+      properties:
+        signo:
+          type: string
+          enum: [presion_arterial, frecuencia_cardiaca, frecuencia_respiratoria, temperatura, saturacion_oxigeno]
+        valor:
+          type: string
+        nivel:
+          type: string
+          enum: [advertencia, critico]
+
+    DatosClinicos:
+      type: object
+      required: [encuentroId, registradoEn, alertas]
+      properties:
+        encuentroId:
+          type: string
+          format: uuid
+        registradoEn:
+          type: string
+          format: date-time
+        alertas:
+          type: array
+          description: Signos vitales fuera de rango. Vacío si todos están en rango normal.
+          items:
+            $ref: '#/components/schemas/AlertaSignoVital'
+
+    Justificacion:
+      type: object
+      required: [resumen, factores]
+      properties:
+        resumen:
+          type: string
+          description: Explicación breve, legible por personal clínico sin formación técnica.
+        factores:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [factor, descripcion]
+            properties:
+              factor:
+                type: string
+              descripcion:
+                type: string
+
+    SugerenciaIa:
+      type: object
+      required: [evaluacionId, encuentroId, resultado, categoriaEsi, justificacion, duracionMs, generadaEn]
+      properties:
+        evaluacionId:
+          type: string
+          format: uuid
+        encuentroId:
+          type: string
+          format: uuid
+        resultado:
+          type: string
+          const: sugerencia_ia
+        categoriaEsi:
+          $ref: '#/components/schemas/CategoriaEsi'
+        justificacion:
+          $ref: '#/components/schemas/Justificacion'
+        duracionMs:
+          type: integer
+          minimum: 0
+        generadaEn:
+          type: string
+          format: date-time
+
+    DerivacionManual:
+      type: object
+      required: [evaluacionId, encuentroId, resultado, motivo, duracionMs, generadaEn]
+      properties:
+        evaluacionId:
+          type: string
+          format: uuid
+        encuentroId:
+          type: string
+          format: uuid
+        resultado:
+          type: string
+          const: derivado_triage_manual
+        motivo:
+          type: string
+          enum: [timeout, servicio_no_disponible, respuesta_invalida]
+          description: |
+            `timeout`: el motor superó los 3 segundos. `servicio_no_disponible`: el motor está
+            caído o el circuit breaker está abierto. `respuesta_invalida`: la respuesta no se
+            pudo interpretar.
+        duracionMs:
+          type: integer
+          minimum: 0
+        generadaEn:
+          type: string
+          format: date-time
+
+    Evaluacion:
+      description: Resultado de una evaluación. El campo `resultado` indica cuál de las dos formas es.
+      oneOf:
+        - $ref: '#/components/schemas/SugerenciaIa'
+        - $ref: '#/components/schemas/DerivacionManual'
+      discriminator:
+        propertyName: resultado
+        mapping:
+          sugerencia_ia: '#/components/schemas/SugerenciaIa'
+          derivado_triage_manual: '#/components/schemas/DerivacionManual'
+
+    ConfirmacionInput:
+      type: object
+      required: [categoriaEsi]
+      properties:
+        categoriaEsi:
+          $ref: '#/components/schemas/CategoriaEsi'
+        justificacionCambio:
+          type: string
+          maxLength: 1000
+          description: Obligatoria si la categoría difiere de la sugerida por la IA.
+
+    CategoriaFinal:
+      type: object
+      required: [encuentroId, categoriaEsi, origen, confirmadaEn]
+      properties:
+        encuentroId:
+          type: string
+          format: uuid
+        categoriaEsi:
+          $ref: '#/components/schemas/CategoriaEsi'
+        origen:
+          type: string
+          enum: [confirmada_sugerencia_ia, modificada_por_enfermera, asignada_triage_manual]
+        justificacionCambio:
+          type: [string, 'null']
+        confirmadaEn:
+          type: string
+          format: date-time
+
+    PacienteEnEspera:
+      type: object
+      required: [encuentroId, nombre, categoriaEsi, esperaMinutos, llegadaEn]
+      properties:
+        encuentroId:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          description: Visible solo para personal clínico autorizado. Nunca se escribe en logs.
+        categoriaEsi:
+          $ref: '#/components/schemas/CategoriaEsi'
+        esperaMinutos:
+          type: integer
+          minimum: 0
+        llegadaEn:
+          type: string
+          format: date-time
+
+    SalaDeEspera:
+      type: object
+      required: [actualizadaEn, pacientes]
+      properties:
+        actualizadaEn:
+          type: string
+          format: date-time
+        pacientes:
+          type: array
+          items:
+            $ref: '#/components/schemas/PacienteEnEspera'
+
+    EventoSalaDeEspera:
+      type: object
+      required: [tipo, encuentroId, ocurridoEn]
+      properties:
+        tipo:
+          type: string
+          enum: [paciente_ingresado, categoria_actualizada, paciente_atendido]
+        encuentroId:
+          type: string
+          format: uuid
+        categoriaEsi:
+          $ref: '#/components/schemas/CategoriaEsi'
+        ocurridoEn:
+          type: string
+          format: date-time
+
+    Decision:
+      type: object
+      required: [decisionId, encuentroRef, pacienteRef, resultado, registradaEn, hashIntegridad]
+      properties:
+        decisionId:
+          type: string
+          format: uuid
+        encuentroRef:
+          type: string
+          description: Referencia opaca al encuentro.
+        pacienteRef:
+          type: string
+          description: Referencia opaca al paciente. Nunca RUT ni nombre.
+        resultado:
+          type: string
+          enum: [sugerencia_ia, derivado_triage_manual]
+        categoriaSugerida:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 5
+        justificacion:
+          oneOf:
+            - $ref: '#/components/schemas/Justificacion'
+            - type: 'null'
+        motivoDerivacion:
+          type: [string, 'null']
+          enum: [timeout, servicio_no_disponible, respuesta_invalida, null]
+        categoriaFinal:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 5
+        registradaEn:
+          type: string
+          format: date-time
+        hashIntegridad:
+          type: string
+          description: Hash del registro. Permite verificar que no fue modificado.
+
+    PaginaDecisiones:
+      type: object
+      required: [datos, siguienteCursor]
+      properties:
+        datos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Decision'
+        siguienteCursor:
+          type: [string, 'null']
+          description: Cursor para la página siguiente. `null` si no hay más resultados.
+
+    Problema:
+      type: object
+      description: Detalle de un problema según RFC 7807.
+      required: [type, title, status, trace_id]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Identificador estable del tipo de problema.
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+        trace_id:
+          type: string
+      additionalProperties: true
+
+  responses:
+
+    SolicitudMalFormada:
+      description: El cuerpo de la solicitud no se pudo interpretar.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://api.meditriage.example/problemas/solicitud-mal-formada
+            title: Solicitud mal formada
+            status: 400
+            detail: El cuerpo no es un JSON válido.
+            trace_id: c8f2b1e4a9d7
+
+    NoAutenticado:
+      description: Falta la autenticación o no es válida.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://api.meditriage.example/problemas/no-autenticado
+            title: No autenticado
+            status: 401
+            trace_id: c8f2b1e4a9d7
+
+    AccesoDenegado:
+      description: El rol del usuario no tiene permiso para esta operación. El intento queda en el log de seguridad.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://api.meditriage.example/problemas/acceso-denegado
+            title: Acceso denegado
+            status: 403
+            detail: El rol enfermera de triage no tiene acceso al historial de auditoría.
+            trace_id: c8f2b1e4a9d7
+
+    NoEncontrado:
+      description: El recurso no existe.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          example:
+            type: https://api.meditriage.example/problemas/recurso-no-encontrado
+            title: Recurso no encontrado
+            status: 404
+            trace_id: c8f2b1e4a9d7
+
+    Conflicto:
+      description: La operación entra en conflicto con el estado actual.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          examples:
+            conflictoIdempotencia:
+              summary: La misma clave de idempotencia con un cuerpo distinto
+              value:
+                type: https://api.meditriage.example/problemas/conflicto-idempotencia
+                title: Conflicto de idempotencia
+                status: 409
+                detail: La clave ya se usó con un cuerpo distinto.
+                trace_id: c8f2b1e4a9d7
+            pacienteYaRegistrado:
+              summary: El RUT ya está registrado
+              value:
+                type: https://api.meditriage.example/problemas/paciente-ya-registrado
+                title: Paciente ya registrado
+                status: 409
+                pacienteId: 4e5f6a7b-8c9d-4e0f-a1b2-c3d4e5f6a7b8
+                trace_id: c8f2b1e4a9d7
+
+    ReglaIncumplida:
+      description: La solicitud es válida como JSON pero incumple una regla del dominio.
+      headers:
+        X-Trace-Id:
+          $ref: '#/components/headers/TraceId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+          examples:
+            rutInvalido:
+              summary: El dígito verificador del RUT no corresponde
+              value:
+                type: https://api.meditriage.example/problemas/rut-invalido
+                title: RUT inválido
+                status: 422
+                detail: El dígito verificador no corresponde al número.
+                trace_id: c8f2b1e4a9d7
+            consentimientoNoOtorgado:
+              summary: El paciente consciente rechazó el consentimiento
+              value:
+                type: https://api.meditriage.example/problemas/consentimiento-no-otorgado
+                title: Consentimiento no otorgado
+                status: 422
+                detail: El registro se bloqueó y el intento quedó en el audit log.
+                trace_id: c8f2b1e4a9d7
+            datosClinicosIncompletos:
+              summary: Faltan datos clínicos obligatorios
+              value:
+                type: https://api.meditriage.example/problemas/datos-clinicos-incompletos
+                title: Datos clínicos incompletos
+                status: 422
+                detail: Falta el motivo de consulta. El caso no se envió al motor de evaluación.
+                camposFaltantes: [motivoConsulta]
+                trace_id: c8f2b1e4a9d7
+            justificacionRequerida:
+              summary: Cambio de categoría sin justificación clínica
+              value:
+                type: https://api.meditriage.example/problemas/justificacion-requerida
+                title: Justificación requerida
+                status: 422
+                detail: La categoría final difiere de la sugerida y no se indicó el motivo.
+                trace_id: c8f2b1e4a9d7
