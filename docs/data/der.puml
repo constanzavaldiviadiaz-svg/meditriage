@@ -1,0 +1,144 @@
+@startuml der
+hide circle
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam defaultFontName Arial
+skinparam entity {
+  BackgroundColor #FFFFFF
+  BorderColor #1E3A5F
+  FontColor #1E3A5F
+}
+skinparam package {
+  BorderColor #1E3A5F
+  FontColor #1E3A5F
+}
+skinparam note {
+  BackgroundColor #FFF8DC
+  BorderColor #B8A060
+}
+
+title MediTriage — DER del contexto clínico
+
+package "Contexto de identidad\n(fuera de este modelo)" #F2F2F2 {
+  entity "paciente" as paciente #EAEAEA {
+    * paciente_id : uuid <<PK>>
+    --
+    RUT, nombre y consentimiento
+    viven en el contexto de identidad
+  }
+}
+
+package "Contexto clínico" {
+
+  entity "encuentro" as encuentro {
+    * encuentro_id : uuid <<PK>>
+    --
+    * paciente_id : uuid <<ref>>
+    * estado : estado_encuentro
+    * motivo_consulta : text
+    * abierto_en : timestamptz
+    cerrado_en : timestamptz
+  }
+
+  entity "signos_vitales" as signos {
+    * signos_vitales_id : uuid <<PK>>
+    --
+    * encuentro_id : uuid <<FK>>
+    * presion_sistolica : smallint
+    * presion_diastolica : smallint
+    * frecuencia_cardiaca : smallint
+    frecuencia_respiratoria : smallint
+    * temperatura : numeric(3,1)
+    * saturacion_oxigeno : smallint
+    * medido_en : timestamptz
+  }
+
+  entity "sintoma" as sintoma {
+    * sintoma_id : uuid <<PK>>
+    --
+    * encuentro_id : uuid <<FK>>
+    * descripcion : varchar(200)
+    * reportado_en : timestamptz
+  }
+
+  entity "alerta_signo_vital" as alerta {
+    * alerta_id : uuid <<PK>>
+    --
+    * signos_vitales_id : uuid <<FK>>
+    * signo : signo_vital
+    * valor : varchar(20)
+    * nivel : nivel_alerta
+    * umbral_aplicado : varchar(50)
+  }
+
+  entity "evaluacion" as evaluacion {
+    * evaluacion_id : uuid <<PK>>
+    --
+    * encuentro_id : uuid <<FK>>
+    * idempotency_key : uuid <<UNIQUE>>
+    * resultado : resultado_evaluacion
+    categoria_esi : smallint
+    justificacion : jsonb
+    motivo_derivacion : motivo_derivacion
+    respuesta_ia_original : jsonb
+    * duracion_ms : integer
+    * generada_en : timestamptz
+  }
+
+  entity "categoria_final" as final {
+    * encuentro_id : uuid <<PK, FK>>
+    --
+    evaluacion_id : uuid <<FK>>
+    * categoria_esi : smallint
+    * origen : origen_categoria
+    justificacion_cambio : text
+    * confirmada_en : timestamptz
+  }
+
+  entity "outbox_evento" as outbox {
+    * evento_id : uuid <<PK>>
+    --
+    * tipo : varchar(100)
+    * version : varchar(10)
+    * aggregate_id : uuid
+    * trace_id : varchar(64)
+    * payload : jsonb
+    * creado_en : timestamptz
+    publicado_en : timestamptz
+  }
+}
+
+paciente ||..o{ encuentro : "referencia\nentre contextos"
+encuentro ||--o{ signos : "registra"
+encuentro ||--o{ sintoma : "reporta"
+signos ||--o{ alerta : "genera"
+encuentro ||--o{ evaluacion : "recibe"
+encuentro ||--o| final : "concluye en"
+evaluacion |o--o| final : "origina"
+
+legend right
+  <b>Decisiones de diseño</b>
+  ----
+  <b>1.</b> <i>paciente</i> vive en el contexto de identidad.
+     La línea punteada no es una FK real: el contexto
+     clínico guarda solo el identificador, nunca RUT ni nombre.
+  ----
+  <b>2.</b> <i>signos_vitales</i> y <i>evaluacion</i> son uno a muchos:
+     el paciente se reevalúa si empeora (hu04, escenario 2).
+  ----
+  <b>3.</b> <i>alerta_signo_vital</i> guarda el umbral aplicado:
+     si los umbrales cambian, queda registro de qué alerta
+     vio la enfermera en su momento.
+  ----
+  <b>4.</b> <i>respuesta_ia_original</i> guarda la respuesta exacta:
+     el modelo no es determinista y no se puede reproducir.
+  ----
+  <b>5.</b> <i>evaluacion</i> y <i>categoria_final</i> están separadas:
+     la IA sugiere y la enfermera decide. Son dos actos distintos.
+  ----
+  <b>6.</b> <i>outbox_evento</i> es el patrón Outbox (ADR 0003).
+     Se inserta en la misma transacción que la decisión;
+     un relay lo publica a la cola y marca <i>publicado_en</i>.
+endlegend
+
+@enduml
