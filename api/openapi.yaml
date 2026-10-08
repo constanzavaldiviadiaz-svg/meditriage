@@ -48,10 +48,16 @@ tags:
   - name: Auditoría
     description: Historial inmutable de decisiones para el auditor clínico.
 
+security:
+  - ClinicalOAuth2: []
+
 paths:
 
   /v1/pacientes:
     post:
+      security:
+        - ClinicalOAuth2:
+            - pacientes:write
       tags: [Pacientes]
       operationId: registrarPaciente
       summary: Registrar un paciente con su consentimiento informado
@@ -104,6 +110,9 @@ paths:
 
   /v1/encuentros:
     post:
+      security:
+        - ClinicalOAuth2:
+            - triage:write
       tags: [Encuentros]
       operationId: abrirEncuentro
       summary: Abrir un encuentro de triage para un paciente
@@ -148,6 +157,9 @@ paths:
 
   /v1/encuentros/{encuentroId}/datos-clinicos:
     put:
+      security:
+        - ClinicalOAuth2:
+            - triage:write
       tags: [Encuentros]
       operationId: registrarDatosClinicos
       summary: Registrar los síntomas y signos vitales
@@ -194,6 +206,9 @@ paths:
 
   /v1/encuentros/{encuentroId}/evaluaciones:
     post:
+      security:
+        - ClinicalOAuth2:
+            - triage:write
       tags: [Evaluación]
       operationId: solicitarEvaluacion
       summary: Solicitar la sugerencia de categoría ESI
@@ -278,6 +293,9 @@ paths:
 
   /v1/encuentros/{encuentroId}/categoria-final:
     put:
+      security:
+        - ClinicalOAuth2:
+            - triage:write
       tags: [Evaluación]
       operationId: confirmarCategoria
       summary: Confirmar o modificar la categoría ESI
@@ -325,6 +343,9 @@ paths:
 
   /v1/sala-de-espera:
     get:
+      security:
+        - ClinicalOAuth2:
+            - triage:read
       tags: [Sala de espera]
       operationId: consultarSalaDeEspera
       summary: Consultar la sala de espera priorizada
@@ -353,6 +374,9 @@ paths:
 
   /v1/sala-de-espera/eventos:
     get:
+      security:
+        - ClinicalOAuth2:
+            - triage:read
       tags: [Sala de espera]
       operationId: suscribirSalaDeEspera
       summary: Recibir los cambios de la sala de espera en tiempo real
@@ -382,6 +406,9 @@ paths:
 
   /v1/auditoria/decisiones:
     get:
+      security:
+        - ClinicalOAuth2:
+            - auditoria:read
       tags: [Auditoría]
       operationId: consultarDecisiones
       summary: Consultar el historial de decisiones
@@ -433,6 +460,9 @@ paths:
 
   /v1/auditoria/decisiones/{decisionId}:
     get:
+      security:
+        - ClinicalOAuth2:
+            - auditoria:read
       tags: [Auditoría]
       operationId: obtenerDecision
       summary: Obtener una decisión con su verificación de integridad
@@ -462,6 +492,37 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
 
 components:
+  securitySchemes:
+    ClinicalOAuth2:
+      type: oauth2
+      description: |
+        AutenticaciÃƒÂ³n del personal clÃƒÂ­nico mediante OAuth2.
+        Los tokens Bearer son emitidos por el proveedor
+        de identidad institucional.
+
+        Los permisos se asignan segÃƒÂºn el rol del usuario,
+        aplicando el principio de mÃƒÂ­nimo privilegio.
+        Roles y permisos autorizados:
+        - Enfermera de triage: pacientes:write, triage:write.
+        - Médico jefe de turno: triage:read.
+        - Auditor clínico: auditoria:read.
+
+        El proveedor de identidad debe emitir únicamente
+        los scopes correspondientes al rol del usuario.
+        El backend debe validar los permisos en cada solicitud.
+
+        Las URL OAuth2 son referenciales y deben configurarse
+        con el proveedor de identidad institucional.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.example.com/oauth/authorize
+          tokenUrl: https://auth.example.com/oauth/token
+          scopes:
+            pacientes:write: Registrar y actualizar pacientes.
+            triage:write: Crear evaluaciones de triage.
+            triage:read: Consultar evaluaciones clÃƒÂ­nicas.
+            auditoria:read: Consultar registros de auditorÃƒÂ­a.
+
 
   parameters:
     IdempotencyKey:
