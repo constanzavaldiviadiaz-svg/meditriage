@@ -9,7 +9,7 @@ secrets/
 credentials.json
 
 # Datos clínicos: nunca versionar datos reales de pacientes.
-data/
+/data/
 *.csv
 *.xlsx
 !docs/**/*.csv
