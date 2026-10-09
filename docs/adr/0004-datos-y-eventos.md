@@ -4,8 +4,6 @@
 
 Propuesto — 09/10/2026
 
-**Borrador:** la sección del broker de eventos espera el análisis del issue #56.
-
 Este ADR **modifica el ADR 0003 en un punto**: la decisión sobre CQRS. El resto del ADR 0003
 sigue vigente.
 
@@ -67,14 +65,70 @@ de PostgreSQL.
 
 ### 2. Broker de eventos
 
-> **Pendiente del análisis del issue #56.**
->
-> Debe resolver: qué broker se usa y por qué, las garantías de entrega y lo que obligan, y qué
-> pasa si el broker falla.
->
-> Punto de partida: la arquitectura actual (ADR 0002, C4 nivel 2) usa Redis como cola de
-> auditoría. Con este ADR, Redis pasa a tener **dos roles** —cola y vista de la sala de
-> espera—, lo que el análisis debe considerar.
+Basado en el análisis del issue #56, de Matías Sepúlveda.
+
+**Se usa Redis Streams, como servicio gestionado.** Redis ya está en la arquitectura (ADR
+0002, C4 nivel 2) como cola de auditoría: no se agrega tecnología nueva. A diferencia de Redis
+Pub/Sub, un *stream* guarda los mensajes, admite grupos de consumidores y exige una
+confirmación (ACK) de cada mensaje procesado. Si un consumidor está caído, los mensajes lo
+esperan.
+
+**Dos consumidores, cada uno a su ritmo.** Cada consumidor es un grupo independiente sobre el
+mismo stream, con sus propias confirmaciones. Si uno se atrasa, el otro no lo espera.
+
+| Grupo de consumidores | Qué hace con cada evento |
+|---|---|
+| **auditoria** | Lo escribe en la base de auditoría append-only |
+| **sala-de-espera** | Actualiza la vista de lectura en Redis (sección 4) |
+
+**Garantía de entrega: al menos una vez (*at-least-once*).** Ningún evento se pierde, pero
+alguno puede llegar dos veces. El recorrido completo:
+
+1. La decisión y su evento se guardan juntos en PostgreSQL, en la misma transacción (Outbox).
+2. El relay publica los eventos pendientes en el stream y marca `publicado_en`.
+3. Cada consumidor procesa el evento.
+4. **Solo después de procesarlo** envía el ACK. Si falla antes, el mensaje queda pendiente y
+   se reintenta.
+
+El duplicado aparece cuando el relay publica y falla antes de marcar `publicado_en`: al
+reintentar, publica de nuevo. Por eso **los consumidores son idempotentes**: cada evento lleva
+su `evento_id` (la clave de la tabla `outbox_evento`), y un evento ya procesado se descarta.
+En auditoría, `evento_id` es una restricción `UNIQUE`: la base misma rechaza el duplicado.
+
+**Qué pasa cuando algo falla:**
+
+| Falla | Qué ocurre | Qué se pierde |
+|---|---|---|
+| **Redis no disponible** | Los eventos esperan en la tabla outbox. El relay reintenta con esperas progresivas y alerta si los pendientes se acumulan. Al volver Redis, publica lo atrasado | Nada |
+| **Consumidor de auditoría caído** | Los mensajes sin ACK quedan pendientes y se procesan al volver | Nada |
+| **Un mensaje falla una y otra vez** | Tras un número fijo de intentos se aparta a un stream de mensajes fallidos para revisión manual, sin bloquear al resto | Nada: queda apartado, no descartado |
+| **Redis pierde datos** (por ejemplo, en una conmutación del servicio gestionado) | Se reconcilia: los eventos de la outbox cuyo `evento_id` no aparece en auditoría se vuelven a publicar. Por eso la outbox **conserva los eventos hasta confirmar que llegaron a auditoría**, no solo hasta publicarlos | Nada |
+
+**Los dos roles de Redis.** Con este ADR, Redis es a la vez la cola de eventos y la vista de la
+sala de espera. Se acepta usar **una sola instancia gestionada**, porque una caída de Redis no
+compromete ni los datos ni el triage:
+
+- **El flujo de triage no pasa por Redis.** Registrar al paciente, evaluar y confirmar la
+  categoría escriben en PostgreSQL. El presupuesto de 3 segundos no depende de Redis.
+- **La auditoría no se pierde.** Espera en la outbox, como muestra la tabla anterior.
+- **El tablero se degrada, pero no se apaga.** Si la vista no responde, `GET
+  /v1/sala-de-espera` consulta directamente PostgreSQL, la fuente de verdad: con 50 pacientes
+  es una consulta trivial. Lo que se pierde mientras tanto es la actualización en tiempo real
+  por SSE; el tablero debe refrescarse a mano.
+
+Para que un rol no dañe al otro, la instancia se configura **sin expulsión de claves**
+(`noeviction`): si la memoria se llenara, Redis rechaza escrituras nuevas en lugar de borrar en
+silencio mensajes del stream. Con ~700 eventos al día, el volumen está muy lejos de ese
+límite. El stream se recorta periódicamente: **los 5 años de retención viven en la base de
+auditoría, no en Redis**.
+
+**Seguridad.** Cifrado en tránsito y en reposo, y acceso a Redis solo desde la aplicación y
+sus procesos. Los eventos llevan únicamente lo que los consumidores necesitan, nunca RUT ni
+nombre: Outbox define explícitamente ese contenido (sección 3).
+
+**Condición de adopción.** El servicio gestionado que se elija en la nube debe ofrecer
+persistencia en disco y una disponibilidad compatible con el 99,5% mensual. Si no la ofrece,
+aplica el disparador hacia RabbitMQ.
 
 ### 3. Patrones de datos
 
@@ -164,8 +218,13 @@ la API no expone.
 - **Consistencia eventual en el tablero.** La vista puede ir unos milisegundos detrás de
   PostgreSQL. Es aceptable para un tablero; no lo sería para la decisión clínica, que sigue
   leyendo de la fuente de verdad.
-- **Redis concentra dos roles.** Si cae, afecta a la cola y a la vista a la vez. Debe
-  considerarlo el análisis del broker.
+- **Redis concentra dos roles.** Si cae, afecta a la cola y a la vista a la vez. No se pierden
+  datos ni se detiene el triage, pero el tablero pierde el tiempo real hasta que vuelva
+  (sección 2).
+- **Los consumidores deben ser idempotentes.** Es el precio de la entrega *at-least-once*: todo
+  consumidor nuevo tiene que descartar eventos repetidos por `evento_id`.
+- **Redis es más débil que un broker dedicado ante pérdida de datos.** Se compensa con la
+  reconciliación contra la outbox, que obliga a conservar los eventos más tiempo.
 - **No hay replay del log de eventos.** Si algún día se necesita reconstruir estados pasados,
   no será posible con este diseño.
 - **La búsqueda de texto es básica.** PostgreSQL busca por texto, pero con menos capacidad que
@@ -183,6 +242,17 @@ la sala de espera, con Redis— y se descartan Kafka y OpenSearch con el criteri
 diapositiva 4 de la misma sesión: no introducir un motor especializado hasta medir que
 PostgreSQL no alcanza. Con ~700 eventos al día y 50 pacientes en la sala, no hay medición que
 lo justifique. Operar ambos contradiría además los ADR 0002 y 0003.
+
+### Redis Pub/Sub como broker
+
+No guarda los mensajes: si el consumidor de auditoría no está conectado en ese momento, el
+evento se pierde. Inaceptable para un registro que la ley exige completo.
+
+### RabbitMQ como broker
+
+Una opción válida para mensajería confiable, pero es una tecnología más que el equipo tendría
+que aprender, integrar y operar, cuando Redis ya está en la arquitectura y alcanza para el
+volumen. Queda como disparador.
 
 ### Una base documental
 
@@ -204,6 +274,7 @@ Qué tendría que ocurrir para revisar este ADR:
 
 | Migrar a… | Cuando… |
 |---|---|
+| **RabbitMQ** | El servicio gestionado de Redis no ofrezca persistencia verificable, o la reconciliación contra la outbox empiece a encontrar eventos perdidos con frecuencia |
 | **Kafka** | Varios consumidores con velocidades muy distintas obliguen a retener más eventos de los razonables en memoria, o se necesite replay del log |
 | **OpenSearch** | El auditor necesite buscar por el contenido de las justificaciones, o la analítica histórica compita con el presupuesto de 3 segundos |
 | **Event Sourcing** | Haya que reconstruir el estado de un encuentro en un momento pasado, no solo auditar sus decisiones |
