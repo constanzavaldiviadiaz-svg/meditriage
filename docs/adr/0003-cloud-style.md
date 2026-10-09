@@ -2,9 +2,9 @@
 
 ## Estado
 
-Propuesto — 02/10/2026
+Aceptado — 02/10/2026
 
-Pasa a *Aceptado* cuando el equipo apruebe el Pull Request correspondiente.
+**Modificado por el [ADR 0004](0004-datos-y-eventos.md)** en un punto: la decisión sobre CQRS, que pasa de descartado a adoptado en versión liviana para la sala de espera. El resto de este ADR sigue vigente.
 
 ## Autores
 
