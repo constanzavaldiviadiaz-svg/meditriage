@@ -9,9 +9,9 @@ Person(auditor, "Auditor clínico", "Verifica el cumplimiento de las decisiones"
 
 System_Boundary(meditriage, "MediTriage") {
   Container(web, "Aplicación web", "Python · FastAPI + Jinja2", "Sirve la interfaz y contiene los módulos Registro, Evaluación, Tablero y Auditoría. Despliegue único.")
-  ContainerDb(db, "Base de datos clínica", "PostgreSQL", "Pacientes, consentimientos, signos vitales y evaluaciones. Cifrada en reposo.")
-  ContainerQueue(cola, "Cola de auditoría", "Redis", "Desacopla el registro de la decisión de la respuesta al usuario.")
-  Container(worker, "Worker de auditoría", "Python", "Consume la cola y persiste cada decisión de forma inmutable.")
+  ContainerDb(db, "Base de datos clínica", "PostgreSQL", "Pacientes, consentimientos, signos vitales, evaluaciones y tabla outbox. Fuente de verdad. Cifrada en reposo.")
+  ContainerQueue(redis, "Redis gestionado", "Redis Streams", "Dos roles: stream de eventos de dominio y vista de lectura de la sala de espera (CQRS liviano).")
+  Container(worker, "Worker de eventos", "Python", "Relay de la outbox al stream. Consume los grupos auditoria y sala-de-espera, de forma idempotente por evento_id.")
   ContainerDb(audit, "Almacén de auditoría", "PostgreSQL · tabla append-only", "Registro inmutable de cada decisión de IA. Retención de 5 años.")
 }
 
@@ -22,11 +22,12 @@ Rel(enfermera, web, "Registra pacientes y valida la prioridad ESI", "HTTPS")
 Rel(medico, web, "Consulta el tablero priorizado", "HTTPS")
 Rel(auditor, web, "Consulta el historial de recomendaciones", "HTTPS")
 
-Rel(web, db, "Lee y escribe datos clínicos", "SQL/TLS")
+Rel(web, db, "Escribe la decisión y su evento en la misma transacción", "SQL/TLS")
 Rel(web, registro, "Valida el RUT del paciente", "HTTPS")
 Rel(web, ia, "Envía síntomas y signos vitales despersonalizados / recibe categoría ESI y justificación", "HTTPS")
-Rel(web, cola, "Publica el evento de decisión", "Redis protocol")
-Rel(worker, cola, "Consume eventos", "Redis protocol")
+Rel(web, redis, "Lee la vista de la sala de espera", "Redis/TLS")
+Rel(worker, db, "Lee los eventos pendientes de la outbox", "SQL/TLS")
+Rel(worker, redis, "Publica y consume eventos; actualiza la vista", "Redis/TLS")
 Rel(worker, audit, "Persiste la decisión de forma inmutable", "SQL/TLS")
 Rel(web, audit, "Lee el historial para el auditor", "SQL/TLS")
 
@@ -37,6 +38,14 @@ note right of ia
 
   Si no responde en 3 s, el caso
   se deriva a triage manual (HU06).
+end note
+
+note right of redis
+  Si Redis cae no se pierden datos:
+  los eventos esperan en la outbox y
+  el tablero lee desde PostgreSQL,
+  sin actualización en tiempo real.
+  Ver ADR 0004.
 end note
 
 SHOW_LEGEND()
