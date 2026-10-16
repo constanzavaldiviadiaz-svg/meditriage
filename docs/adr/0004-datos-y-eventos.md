@@ -199,8 +199,37 @@ infraestructura.
 **PostgreSQL sigue siendo la fuente de verdad.** Si la vista en Redis se pierde o se
 corrompe, se reconstruye desde PostgreSQL. La vista es desechable; los datos no.
 
+**Cómo se reconstruye.** La vista no depende de haber recibido todos los eventos, porque
+nunca se reconstruye a partir de ellos:
+
+1. **Al arrancar**, y cada vez que detecta que la vista no existe, el consumidor de la sala de
+   espera la arma de nuevo con una consulta a PostgreSQL: los encuentros abiertos, con su
+   categoría vigente.
+2. **Después** sigue leyendo el stream. Un evento que ya estaba reflejado en la consulta se
+   descarta por `evento_id`, como cualquier duplicado.
+3. **Cada pocos minutos** compara la vista con PostgreSQL. Si difieren, la reconstruye.
+
+Así, si Redis pierde eventos, el tablero se corrige solo en el siguiente ciclo, sin depender
+de lo que haga el consumidor de auditoría. Con 50 pacientes, la consulta completa es
+trivial.
+
 El contrato OpenAPI no cambia: de dónde lee el servidor es un detalle de implementación que
 la API no expone.
+
+### 5. Protección del registro de auditoría
+
+"Append-only" es la regla; estas capas la hacen cumplir. Cada una cubre una amenaza distinta:
+
+| Capa | Qué hace | Contra qué protege |
+|---|---|---|
+| **Permisos** | El usuario de base de datos del worker solo tiene `INSERT`. La aplicación solo tiene `SELECT`. Nadie tiene `UPDATE` ni `DELETE` | Un error o un ataque a través de la aplicación |
+| **Trigger** | Rechaza cualquier `UPDATE` o `DELETE` sobre la tabla, venga de quien venga | Un permiso mal otorgado por error |
+| **Cadena de hashes** | Cada registro guarda el hash de su contenido junto con el hash del registro anterior. Alterar uno rompe la cadena desde ese punto | Una modificación directa en la base, incluso de un administrador |
+| **Respaldos inmutables** | Copias en almacenamiento con bloqueo de borrado (*WORM*) durante 5 años | La pérdida o destrucción de la base |
+
+La cadena de hashes no impide modificar un registro, pero **lo hace detectable**: una
+verificación periódica la recorre y alerta si encuentra un eslabón roto. El auditor puede
+ejecutarla también, para confiar en lo que consulta.
 
 ## Consecuencias
 
@@ -212,6 +241,8 @@ la API no expone.
 - **Sigue los criterios de la propia sesión**: PostgreSQL primero, Outbox siempre, y Event
   Sourcing solo si el problema lo pide.
 - **Outbox protege también los datos sensibles**, no solo la entrega.
+- **La auditoría es verificable**, no solo declarada inmutable: cualquier alteración queda a
+  la vista en la cadena de hashes.
 
 ### Negativas
 
@@ -225,6 +256,8 @@ la API no expone.
   consumidor nuevo tiene que descartar eventos repetidos por `evento_id`.
 - **Redis es más débil que un broker dedicado ante pérdida de datos.** Se compensa con la
   reconciliación contra la outbox, que obliga a conservar los eventos más tiempo.
+- **La cadena de hashes obliga a escribir la auditoría en orden**, un registro tras otro. Con
+  ~700 eventos al día no es un límite, pero lo sería con un volumen mucho mayor.
 - **No hay replay del log de eventos.** Si algún día se necesita reconstruir estados pasados,
   no será posible con este diseño.
 - **La búsqueda de texto es básica.** PostgreSQL busca por texto, pero con menos capacidad que
