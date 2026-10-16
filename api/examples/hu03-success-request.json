@@ -1,0 +1,10 @@
+{
+  "patient_id": "12345678-5",
+  "vitals": {
+    "heart_rate": 115,
+    "blood_pressure": "140/90",
+    "oxygen_saturation": 95,
+    "temperature": 38.2
+  },
+  "symptoms_summary": "Dolor torácico agudo con irradiación al brazo izquierdo."
+}
