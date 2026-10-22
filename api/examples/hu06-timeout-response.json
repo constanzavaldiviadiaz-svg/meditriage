@@ -1,0 +1,5 @@
+{
+  "error_code": "IA_TIMEOUT",
+  "message": "El motor de IA superó el tiempo máximo de espera (3 segundos). Se recomienda fallback a triage manual.",
+  "status": 504
+}
