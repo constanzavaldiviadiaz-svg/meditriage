@@ -37,6 +37,22 @@ la enfermera una sugerencia de categoría ESI (1 a 5) acompañada de su justific
 * [Diagramas C4](docs/c4/) — contexto (nivel 1) y contenedores (nivel 2)
 * [Atributos de calidad](docs/arch/atributos-calidad.md) — los 3 NFRs prioritarios
 
+## Cómo correr la aplicación
+
+Requiere Python 3.11.
+
+```bash
+python -m venv .venv
+.venv/Scripts/activate            # en Windows; en Linux o macOS: source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+python -m src.main                # la API queda en http://localhost:8080
+pytest --cov=src                  # pruebas con cobertura
+ruff check .                      # lint
+```
+
+Con la aplicación corriendo, la documentación interactiva está en http://localhost:8080/docs.
+
 ## Flujo de trabajo
 
 Las convenciones de ramas, commits y Pull Requests están en [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -1,0 +1,14 @@
+# Configuración de las herramientas de desarrollo.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# E/F: errores básicos · I: orden de imports · B: errores comunes · UP: sintaxis moderna
+select = ["E", "F", "I", "B", "UP"]
+# B008: FastAPI usa llamadas como Header(...) en los parámetros por diseño.
+ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
