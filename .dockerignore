@@ -1,0 +1,12 @@
+# Qué se envía a Docker al construir la imagen.
+#
+# Se usa una lista blanca: se excluye todo y se permite solo lo que la imagen necesita.
+# Así, un archivo nuevo (un .env, una clave, datos de prueba) nunca entra por accidente.
+
+*
+!src/
+!requirements.txt
+
+# Dentro de lo permitido, se excluyen los archivos generados por Python.
+**/__pycache__
+**/*.pyc
