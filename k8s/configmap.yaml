@@ -5,4 +5,4 @@ metadata:
   name: meditriage-config
   namespace: meditriage
 data:
-  AMBIENTE: "production"
+  AMBIENTE: "produccion"
