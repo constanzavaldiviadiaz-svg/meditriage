@@ -53,6 +53,13 @@ ruff check .                      # lint
 
 Con la aplicación corriendo, la documentación interactiva está en http://localhost:8080/docs.
 
+### Con Docker
+
+```bash
+docker build -t meditriage .
+docker run -p 8080:8080 meditriage
+```
+
 ## Flujo de trabajo
 
 Las convenciones de ramas, commits y Pull Requests están en [CONTRIBUTING.md](CONTRIBUTING.md).
