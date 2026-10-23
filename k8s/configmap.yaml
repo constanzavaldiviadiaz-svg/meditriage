@@ -1,0 +1,8 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: meditriage-config
+  namespace: meditriage
+data:
+  AMBIENTE: "production"
