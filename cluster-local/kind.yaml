@@ -1,0 +1,18 @@
+# Clúster local de MediTriage con kind (ADR 0005).
+#
+# kind levanta Kubernetes dentro de un contenedor de Docker. Un solo nodo basta para
+# desarrollo: hace de plano de control y también corre las aplicaciones.
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: meditriage
+
+nodes:
+  - role: control-plane
+    # El nodo vive dentro de Docker, así que hay que "abrir una ventana" hacia el computador:
+    # el puerto 8088 del computador llega al puerto 30080 del nodo, donde escucha Traefik.
+    # Resultado: http://localhost:8088 entra al clúster por el Ingress.
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 8088
+        protocol: TCP
