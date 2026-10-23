@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/constanzavaldiviadiaz-svg/meditriage-api@sha256:5bb8eb9ad9cda3fcbd9a4e13cba365b1d494ecc574109c8253e2f23b9c89907
+          image: ghcr.io/constanzavaldiviadiaz-svg/meditriage-api@sha256:5bb8eb9ada9cda3fcbd9a4e13cba365b1d494ecc574109c8253e2f23b9c89907
           ports:
             - name: http
               containerPort: 8080
