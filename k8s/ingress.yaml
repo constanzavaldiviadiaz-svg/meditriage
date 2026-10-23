@@ -5,6 +5,7 @@ metadata:
   name: meditriage-api
   namespace: meditriage
 spec:
+  ingressClassName: traefik
   rules:
     - http:
         paths:
