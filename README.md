@@ -60,6 +60,12 @@ docker build -t meditriage .
 docker run -p 8080:8080 meditriage
 ```
 
+### En Kubernetes
+
+El clúster local se levanta con kind; los pasos están en [cluster-local/](cluster-local/README.md).
+
+![kubectl get all -n meditriage](docs/img/kubectl-get-all.png)
+
 ## Flujo de trabajo
 
 Las convenciones de ramas, commits y Pull Requests están en [CONTRIBUTING.md](CONTRIBUTING.md).
