@@ -37,6 +37,10 @@ la enfermera una sugerencia de categoría ESI (1 a 5) acompañada de su justific
 * [Diagramas C4](docs/c4/) — contexto (nivel 1) y contenedores (nivel 2)
 * [Atributos de calidad](docs/arch/atributos-calidad.md) — los 3 NFRs prioritarios
 
+**Seguridad**
+
+* [Threat model STRIDE](docs/threat-model.md) — amenazas del flujo de triage y sus mitigaciones
+
 ## Cómo correr la aplicación
 
 Requiere Python 3.11.
