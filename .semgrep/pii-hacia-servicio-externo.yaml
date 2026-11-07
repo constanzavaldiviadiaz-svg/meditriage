@@ -1,0 +1,37 @@
+# Regla propia de MediTriage: el RUT y el nombre nunca salen hacia un servicio externo.
+#
+# Por qué: el ADR 0002 fija que al servicio de IA solo se le envían datos clínicos
+# despersonalizados. Esta regla revisa toda llamada HTTP que envía un cuerpo o parámetros.
+# Threat model: Information disclosure en el límite de confianza con la IA externa.
+#
+# Lo permitido: enviar signos vitales, síntomas y referencias opacas (encuentroId).
+# Prueba: tests/semgrep/pii-hacia-servicio-externo.py
+
+rules:
+  - id: meditriage-pii-hacia-servicio-externo
+    languages: [python]
+    severity: ERROR
+    message: >-
+      Una llamada HTTP envía el RUT o el nombre del paciente. Al servicio de IA y a cualquier
+      tercero solo van datos clínicos despersonalizados (ADR 0002, Ley 19.628).
+    metadata:
+      category: security
+      cwe: "CWE-359: Exposure of Private Personal Information to an Unauthorized Actor"
+      stride: Information disclosure
+    patterns:
+      # 1. Una llamada HTTP que envía datos (httpx, requests o un cliente propio)...
+      - pattern-either:
+          - pattern-inside: $CLIENTE.$METODO(..., json=$CUERPO, ...)
+          - pattern-inside: $CLIENTE.$METODO(..., data=$CUERPO, ...)
+          - pattern-inside: $CLIENTE.$METODO(..., params=$CUERPO, ...)
+      - metavariable-regex:
+          metavariable: $METODO
+          regex: ^(post|put|patch|get|request|send|stream)$
+      # 2. ...cuyo contenido lleva el RUT o el nombre, como clave o como dato.
+      - pattern-either:
+          - pattern: '{..., "rut": $V, ...}'
+          - pattern: '{..., "nombre": $V, ...}'
+          - pattern: dict(..., rut=$V, ...)
+          - pattern: dict(..., nombre=$V, ...)
+          - pattern: $OBJ.rut
+          - pattern: $OBJ.nombre
