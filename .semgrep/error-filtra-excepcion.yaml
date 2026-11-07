@@ -1,0 +1,36 @@
+# Regla propia de MediTriage: un error de la API nunca muestra el mensaje interno de una
+# excepción.
+#
+# Por qué: el mensaje de una excepción puede traer rutas de archivos, consultas SQL, datos del
+# paciente o detalles del servicio de IA. El cliente recibe un error RFC 7807 con un texto
+# propio y el trace_id; el detalle técnico va al log, ya sin PII.
+# Threat model: Information disclosure por mensajes de error.
+#
+# Prueba: tests/semgrep/error-filtra-excepcion.py
+
+rules:
+  - id: meditriage-error-filtra-excepcion
+    languages: [python]
+    severity: ERROR
+    message: >-
+      La respuesta de error incluye la excepción capturada. Usa un texto propio en el
+      Problema y deja el detalle técnico en el log: el cliente puede seguirlo con el trace_id.
+    metadata:
+      category: security
+      cwe: "CWE-209: Generation of Error Message Containing Sensitive Information"
+      stride: Information disclosure
+    patterns:
+      # 1. Dentro de un bloque except que guarda la excepción en una variable...
+      - pattern-inside: |
+          try:
+            ...
+          except $TIPO as $ERROR:
+            ...
+      # 2. ...se arma una respuesta de error que la contiene.
+      #    Como argumento posicional o con nombre (detalle=..., content=...).
+      - pattern-either:
+          - pattern: $RESPUESTA(..., <... $ERROR ...>, ...)
+          - pattern: $RESPUESTA(..., $CAMPO=<... $ERROR ...>, ...)
+      - metavariable-regex:
+          metavariable: $RESPUESTA
+          regex: ^(Problema|JSONResponse|HTTPException)$
