@@ -2,9 +2,7 @@
 
 ## Estado
 
-Propuesto — 25/09/2026
-
-Pasa a *Aceptado* cuando el equipo apruebe el Pull Request correspondiente.
+Aceptado — 25/09/2026
 
 ## Autores
 
