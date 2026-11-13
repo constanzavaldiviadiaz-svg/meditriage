@@ -496,12 +496,12 @@ components:
     ClinicalOAuth2:
       type: oauth2
       description: |
-        AutenticaciÃƒÂ³n del personal clÃƒÂ­nico mediante OAuth2.
+        Autenticación del personal clínico mediante OAuth2.
         Los tokens Bearer son emitidos por el proveedor
         de identidad institucional.
 
-        Los permisos se asignan segÃƒÂºn el rol del usuario,
-        aplicando el principio de mÃƒÂ­nimo privilegio.
+        Los permisos se asignan según el rol del usuario,
+        aplicando el principio de mínimo privilegio.
         Roles y permisos autorizados:
         - Enfermera de triage: pacientes:write, triage:write.
         - Médico jefe de turno: triage:read.
@@ -520,8 +520,8 @@ components:
           scopes:
             pacientes:write: Registrar y actualizar pacientes.
             triage:write: Crear evaluaciones de triage.
-            triage:read: Consultar evaluaciones clÃƒÂ­nicas.
-            auditoria:read: Consultar registros de auditorÃƒÂ­a.
+            triage:read: Consultar evaluaciones clínicas.
+            auditoria:read: Consultar registros de auditoría.
 
 
   parameters:
