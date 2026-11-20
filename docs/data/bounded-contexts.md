@@ -129,50 +129,23 @@ Si en el futuro MediTriage incorpora funcionalidades de pagos o gestión de plan
 La relación entre los contextos internos y los sistemas externos se puede representar de la siguiente manera:
 
 ```text
-                         ┌─────────────────────┐
-                         │    REGISTRO CIVIL   │
-                         │       Externo       │
-                         └──────────┬──────────┘
-                                    │
-                                    │ validación
-                                    ▼
-                         ┌─────────────────────┐
-                         │     IDENTIDAD       │
-                         │                     │
-                         │       Person        │
-                         └──────────┬──────────┘
-                                    │
-                                    │ identidad válida
-                                    │ y consentimiento
-                                    ▼
-                         ┌─────────────────────┐
-                         │       CLÍNICO       │
-                         │                     │
-                         │      encuentro      │
-                         │                     │
-                         │     Triaje / ESI    │
-                         └──────────┬──────────┘
-                                    │
-                                    │ datos clínicos
-                                    │ sin identificadores
-                                    ▼
-                         ┌─────────────────────┐
-                         │    SERVICIO DE IA   │
-                         │       Externo       │
-                         └──────────┬──────────┘
-                                    │
-                                    │ sugerencia y
-                                    │ justificación
-                                    ▼
-                         ┌─────────────────────┐
-                         │      AUDITORÍA      │
-                         │                     │
-                         │      AuditLog       │
-                         └─────────────────────┘
+REGISTRO CIVIL (externo)
+        │ validación
+        ▼
+IDENTIDAD (Person)
+        │ identidad válida y consentimiento
+        ▼
+CLÍNICO (encuentro, Triaje / ESI) ⇄ SERVICIO DE IA (externo)
+        │
+        │ Clínico registra la decisión
+        ▼
+AUDITORÍA (AuditLog)
 
+Clínico → Servicio de IA: datos clínicos sin identificadores.
+Servicio de IA → Clínico: sugerencia y justificación.
 
-                         ┌─────────────────────┐
-                         │    FACTURACIÓN      │
-                         │                     │
-                         │  Fuera del alcance  │
-                         └─────────────────────┘
+┌─────────────────────┐
+│     FACTURACIÓN     │
+│  Fuera del alcance  │
+└─────────────────────┘
+```
