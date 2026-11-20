@@ -1,4 +1,3 @@
-
 ### En Kubernetes
 
 El clúster local se levanta con kind; los pasos están en [cluster-local/](cluster-local/README.md).
