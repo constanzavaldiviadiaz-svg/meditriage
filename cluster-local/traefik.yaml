@@ -1,0 +1,18 @@
+# Configuración de Traefik, el controlador de Ingress del clúster local (ADR 0005).
+# Se instala con Helm: ver cluster-local/README.md.
+
+# Traefik recibe el tráfico en el puerto 30080 del nodo, el que kind.yaml conecta con el
+# puerto 8088 del computador.
+service:
+  type: NodePort
+ports:
+  web:
+    nodePort: 30080
+  websecure:
+    expose:
+      default: false
+
+# Traefik se registra como el controlador de los Ingress con ingressClassName: traefik.
+ingressClass:
+  enabled: true
+  isDefaultClass: false

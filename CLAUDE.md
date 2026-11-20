@@ -8,11 +8,14 @@ MediTriage — Triage clínico asistido por IA. Proyecto del ramo **Taller de In
 Software** (18 sesiones). No es un repo de producto: es un repo académico donde **cada
 sesión de clase aporta un artefacto entregable**, evaluado con rúbrica.
 
-**Sesión vigente: S03** (arquitectura y modelo C4). La S01 y la S02 fueron entregadas. No adelantarse a sesiones que el equipo aún no ha cursado: crear
+**Sesión vigente: S07 y S08** (contenedores, K8s e IaC · CI/CD y GitOps), que se trabajan en
+paralelo. De la S01 a la S06 fueron entregadas. No adelantarse a sesiones que el equipo aún no ha cursado: crear
 artefactos de sesiones futuras desordena la cronología del repo y contradice la política de
 IA del ramo. Actualizar esta línea al avanzar de sesión.
 
-Estado actual: solo documentación, todavía no existe código.
+Estado actual: aplicación FastAPI mínima en `src/` (solo el registro de pacientes, HU01, con
+almacenamiento en memoria), `Dockerfile`, manifiestos en `k8s/`, clúster local en
+`cluster-local/` y un workflow de GitHub Actions que prueba y publica la imagen en GHCR.
 
 ## Idioma
 
@@ -91,6 +94,8 @@ La revisión cruzada no es opcional: es la razón por la que existe el flujo de 
   **Título · Estado · Contexto · Decisión · Consecuencias · Alternativas descartadas**.
   Estado toma uno de: Propuesto · Aceptado · Reemplazado · Deprecado.
   El ADR 0001 usa el formato anterior de la S01, sin Estado ni Alternativas: **no se corrige**.
+  **La numeración del profesor va corrida en uno**: lo que sus diapositivas llaman "ADR 0004"
+  (plataforma K8s) es nuestro 0005, y su "ADR 0005" (GitOps) es nuestro 0006.
 - `docs/c4/` — diagramas C4. Fuente `.puml` con la librería C4 (`!include <C4/C4_Context>`)
   más el `.png` exportado. Se entregan los niveles 1 y 2; el 3 solo para componentes críticos.
 - `docs/arch/` — atributos de calidad y documentación de arquitectura.
@@ -99,6 +104,10 @@ La revisión cruzada no es opcional: es la razón por la que existe el flujo de 
 
 **Un ADR nunca se edita.** Si una decisión cambia, el anterior se marca como *Reemplazado* y
 se escribe uno nuevo.
+
+Con diagramas grandes, la URL hexadecimal del comando siguiente excede el límite: hay que
+codificar con deflate (zlib sin cabecera) y el alfabeto base64 propio de PlantUML, y usar la
+URL sin el `~h`.
 
 Para renderizar un `.puml` a PNG sin instalar nada:
 `curl -o salida.png "http://www.plantuml.com/plantuml/png/~h$(xxd -p archivo.puml | tr -d '\n')"`
@@ -116,6 +125,22 @@ Consecuencias que condicionan cualquier diseño posterior:
 - La latencia depende de un tercero, así que **HU06 (derivación a triage manual) es obligatoria**.
 - Al servicio de IA **nunca se le envían RUT ni nombre**, solo datos clínicos despersonalizados.
 - Las respuestas no son deterministas: el audit log guarda la respuesta exacta entregada.
+
+Del [ADR 0004](docs/adr/0004-datos-y-eventos.md) (datos y eventos):
+
+- **PostgreSQL** para identidad, clínico y auditoría (esta última append-only, en base
+  separada); **Redis** para la vista de la sala de espera y como broker (Redis Streams).
+- **Outbox** y **CQRS liviano** adoptados; Saga, Event Sourcing y CDC descartados.
+- Entrega *at-least-once*: todo consumidor es idempotente por `evento_id`.
+
+Del [ADR 0005](docs/adr/0005-plataforma-k8s.md) (plataforma):
+
+- **Kubernetes gestionado** en producción, porque no amarra a un proveedor (el ADR 0003 lo
+  dejó sin elegir). Las bases de datos quedan **fuera** del clúster, como servicios gestionados.
+- **kind** en local, **Terraform** para la infraestructura, **Kustomize** para los manifiestos,
+  **Traefik** como Ingress (ingress-nginx está retirado). Helm solo para componentes de terceros.
+- **Frontera**: Terraform crea el namespace y los Secrets; los manifiestos no los declaran.
+- Imagen **distroless**, no root, Python 3.11, referenciada por digest.
 
 ## Roadmap del ramo
 

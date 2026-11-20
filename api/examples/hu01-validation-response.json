@@ -1,0 +1,5 @@
+{
+  "error_code": "INVALID_RUT_FORMAT",
+  "message": "El RUT ingresado tiene un dígito verificador inválido.",
+  "status": 400
+}
