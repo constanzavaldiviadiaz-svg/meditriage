@@ -1,0 +1,8 @@
+# Configuración de metrics-server, que mide la CPU y la memoria de cada pod.
+# Sin él, el HPA no tiene con qué decidir cuándo escalar (#70).
+# Se instala con Helm: ver cluster-local/README.md.
+
+args:
+  # En kind, los certificados del nodo no están firmados por una autoridad reconocida.
+  # Esta opción se usa solo en el clúster local, nunca en uno real.
+  - --kubelet-insecure-tls

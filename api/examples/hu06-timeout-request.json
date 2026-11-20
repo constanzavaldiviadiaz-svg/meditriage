@@ -1,0 +1,6 @@
+{
+  "triage_id": "b1a2c3d4-5678-90ab-cdef-1234567890ab",
+  "patient_id": "12345678-5",
+  "vitals_summary": "HR: 115, BP: 140/90",
+  "symptoms_summary": "Dolor torácico agudo"
+}

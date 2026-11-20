@@ -1,0 +1,23 @@
+extends:
+  - spectral:oas
+
+rules:
+  operation-operationId: error
+  operation-description: warn
+  operation-tag-defined: warn
+
+  # Regla personalizada de MediTriage:
+  # Cada operación debe documentar una respuesta de error.
+  meditriage-error-response:
+    description: Cada operación debe incluir al menos una respuesta 4xx o 5xx.
+    message: "La operación debe documentar al menos una respuesta de error 4xx o 5xx."
+    severity: error
+    given: "$.paths[*][get,post,put,patch,delete].responses"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          not:
+            propertyNames:
+              pattern: "^(?![45][0-9]{2}$)"

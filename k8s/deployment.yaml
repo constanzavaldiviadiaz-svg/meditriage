@@ -1,0 +1,51 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meditriage-api
+  namespace: meditriage
+  labels:
+    app: meditriage
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: meditriage
+  template:
+    metadata:
+      labels:
+        app: meditriage
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/constanzavaldiviadiaz-svg/meditriage-api@sha256:5bb8eb9ada9cda3fcbd9a4e13cba365b1d494ecc574109c8253e2f23b9c89907
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PUERTO
+              value: "8080"
+            - name: AMBIENTE
+              valueFrom:
+                configMapKeyRef:
+                  name: meditriage-config
+                  key: AMBIENTE
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
