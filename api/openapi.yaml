@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: MediTriage API
-  version: 1.0.0
+  version: 1.1.0
   summary: Triage clínico asistido por IA para centros de atención primaria.
   description: |
     API de MediTriage. Permite registrar pacientes con consentimiento informado, capturar sus
@@ -948,6 +948,13 @@ components:
           type: [integer, 'null']
           minimum: 1
           maximum: 5
+        confirmadaPor:
+          type: [string, 'null']
+          description: |
+            Referencia opaca al profesional que confirmó la categoría final: el identificador
+            del usuario en el proveedor de identidad, nunca su nombre ni su RUT. Permite probar
+            quién decidió cuando la categoría final difiere de la sugerida. Nulo mientras la
+            categoría no se confirme.
         registradaEn:
           type: string
           format: date-time
