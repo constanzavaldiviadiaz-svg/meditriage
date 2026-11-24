@@ -8,14 +8,21 @@ MediTriage — Triage clínico asistido por IA. Proyecto del ramo **Taller de In
 Software** (18 sesiones). No es un repo de producto: es un repo académico donde **cada
 sesión de clase aporta un artefacto entregable**, evaluado con rúbrica.
 
-**Sesión vigente: S07 y S08** (contenedores, K8s e IaC · CI/CD y GitOps), que se trabajan en
-paralelo. De la S01 a la S06 fueron entregadas. No adelantarse a sesiones que el equipo aún no ha cursado: crear
+**Sesión vigente: S09** (DevSecOps I: shift-left security — SAST, SCA, secretos, SBOM y
+threat model STRIDE). De la S01 a la S06 fueron entregadas. La S07 y la S08 se entregaron con
+piezas pendientes: Terraform (#71), HPA (#70), Argo CD (#78) y ADR 0006 (#79). No adelantarse a sesiones que el equipo aún no ha cursado: crear
 artefactos de sesiones futuras desordena la cronología del repo y contradice la política de
 IA del ramo. Actualizar esta línea al avanzar de sesión.
 
-Estado actual: aplicación FastAPI mínima en `src/` (solo el registro de pacientes, HU01, con
-almacenamiento en memoria), `Dockerfile`, manifiestos en `k8s/`, clúster local en
-`cluster-local/` y un workflow de GitHub Actions que prueba y publica la imagen en GHCR.
+Estado actual:
+
+- **En `main`**: aplicación FastAPI mínima en `src/` (solo el registro de pacientes, HU01, con
+  almacenamiento en memoria), `Dockerfile`, manifiestos en `k8s/`, clúster local en
+  `cluster-local/` y el workflow `publish-image.yml`, que prueba y publica la imagen en GHCR.
+- **En revisión**: el pipeline de calidad `ci.yml` (PR #90), las reglas Semgrep propias
+  (PR #98) y el threat model `docs/threat-model.md` (PR #99).
+- **Fuera de este repo**: `meditriage-gitops`, con los manifiestos en `base/` y
+  `overlays/{dev,prod}`, para Argo CD.
 
 ## Idioma
 
@@ -62,7 +69,10 @@ Los límites importan:
 **La fuente canónica es [CONTRIBUTING.md](CONTRIBUTING.md).** Si algo aquí difiere de ese
 archivo, manda CONTRIBUTING.md. Resumen para no tener que abrirlo en cada tarea:
 
-- `main` es rama protegida: nadie commitea directo, ni la dueña del repo.
+- `main` es rama protegida: nadie commitea directo, ni la dueña del repo. Desde el 23/10 exige
+  **2 aprobaciones**, conversaciones resueltas, la rama al día y el check `Quality checks` en
+  verde. Las aprobaciones se descartan si el PR cambia después: al abrir un PR, pedir dos
+  revisores.
 - Un issue = una rama = un PR. Ramas: `tipo/N-descripcion`, con `N` el número del issue.
   Prefijos: `feat/` `fix/` `docs/` `chore/`.
 - El cuerpo del PR lleva `Closes #N` **en inglés**: en español GitHub no lo reconoce y el
@@ -100,6 +110,11 @@ La revisión cruzada no es opcional: es la razón por la que existe el flujo de 
   más el `.png` exportado. Se entregan los niveles 1 y 2; el 3 solo para componentes críticos.
 - `docs/arch/` — atributos de calidad y documentación de arquitectura.
 - `docs/backlog.md`, `docs/impact-map.md`, `docs/scenarios/*.feature` — requisitos (S02).
+- `api/openapi.yaml` — el contrato, fuente de verdad de la API (S05). Todo cambio sigue
+  `docs/api/versioning-policy.md`: el PR declara si es compatible o incompatible, y sube
+  `info.version`. Debe pasar Spectral con `.spectral.yaml`.
+- `docs/threat-model.md` — modelo de amenazas STRIDE (S09). Revisarlo cuando cambie un límite
+  de confianza: un servicio externo nuevo, un endpoint público, otra base de datos.
 - Documentación en español.
 
 **Un ADR nunca se edita.** Si una decisión cambia, el anterior se marca como *Reemplazado* y
@@ -111,6 +126,21 @@ URL sin el `~h`.
 
 Para renderizar un `.puml` a PNG sin instalar nada:
 `curl -o salida.png "http://www.plantuml.com/plantuml/png/~h$(xxd -p archivo.puml | tr -d '\n')"`
+
+## Seguridad en el código (S09)
+
+Tres reglas Semgrep propias, en `.semgrep/` (PR #98, en revisión), bloquean el PR si el código:
+
+- manda el RUT o el nombre del paciente a un `print` o a un log, salvo enmascarado con
+  `enmascarar_rut()`;
+- envía el RUT o el nombre en una llamada HTTP a un servicio externo, como la IA;
+- incluye la excepción capturada en una respuesta de error. El cliente recibe un texto propio
+  y el `trace_id`; el detalle va al log.
+
+Sus casos de prueba están en `tests/semgrep/` y no junto a las reglas, porque Semgrep no busca
+pruebas dentro de carpetas ocultas. Se prueban con `bash tests/semgrep/probar-reglas.sh`, de a
+una regla, porque `semgrep --test` acepta una sola configuración. Semgrep corre por Docker
+(`semgrep/semgrep`): no está instalado en el equipo.
 
 ## Decisiones de arquitectura vigentes
 
