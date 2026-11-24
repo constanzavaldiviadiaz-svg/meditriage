@@ -1,0 +1,37 @@
+# Regla propia de MediTriage: el RUT y el nombre del paciente nunca llegan a un log.
+#
+# Por qué: la Ley 19.628 exige enmascarar los datos personales en los logs (CLAUDE.md,
+# "Datos sensibles"), y los logs se copian, se reenvían y los leen personas sin acceso clínico.
+# Threat model: Information disclosure (docs/threat-model.md).
+#
+# Lo permitido: registrar el pacienteId o el RUT pasado por enmascarar_rut().
+# Prueba: tests/semgrep/pii-en-logs.py
+
+rules:
+  - id: meditriage-pii-en-logs
+    languages: [python]
+    severity: ERROR
+    message: >-
+      El RUT o el nombre del paciente llegan a un log o a la salida estándar. La Ley 19.628
+      exige enmascarar los datos personales: registra el pacienteId o usa enmascarar_rut().
+    metadata:
+      category: security
+      cwe: "CWE-532: Insertion of Sensitive Information into Log File"
+      stride: Information disclosure
+    patterns:
+      # 1. Dentro de un print o de una llamada a un logger...
+      - pattern-either:
+          - pattern-inside: print(...)
+          - patterns:
+              - pattern-inside: $LOGGER.$NIVEL(...)
+              - metavariable-regex:
+                  metavariable: $NIVEL
+                  regex: ^(debug|info|warning|warn|error|exception|critical|log)$
+      # 2. ...aparece el RUT o el nombre, como variable o como atributo...
+      - pattern-either:
+          - pattern: rut
+          - pattern: nombre
+          - pattern: $OBJ.rut
+          - pattern: $OBJ.nombre
+      # 3. ...y no está pasando por la función que lo enmascara.
+      - pattern-not-inside: enmascarar_rut(...)
