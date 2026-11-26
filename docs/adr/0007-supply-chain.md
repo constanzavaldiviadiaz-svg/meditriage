@@ -137,21 +137,43 @@ consulta quien audita.
 ### 4. Escaneos que bloquean
 
 Se suman a los de la sesión 09 (Semgrep, Gitleaks y Trivy sobre las dependencias). Corren en
-cada Pull Request y son checks obligatorios, así que lo que llega a `main`, y por lo tanto lo
-que se firma, ya los pasó.
+cada Pull Request y son checks obligatorios, así que lo que llega a `main` ya los pasó. El de
+contenedor se repite, además, sobre la imagen publicada, justo antes de firmarla (punto 6).
 
 | Escaneo | Herramienta | Sobre qué | Bloquea con | Issue |
 |---|---|---|---|---|
 | Infraestructura como código | Checkov | `terraform/` y `k8s/` | Cualquier falla | #116 |
-| Contenedor | Trivy | La imagen construida en el PR | HIGH o CRITICAL con parche disponible | #92 |
+| Contenedor | Trivy | La imagen construida en el PR y, en `main`, la publicada | CRITICAL siempre; HIGH si tiene parche | #92 |
 | DAST | ZAP, *API scan* | La aplicación levantada como contenedor dentro del pipeline, usando su contrato OpenAPI | Riesgo Medium o superior | #117 |
 
+**Una vulnerabilidad CRITICAL bloquea siempre, tenga o no parche.** Si hay parche, se
+actualiza. Si no lo hay, no queda excluida en silencio: el DevSecOps Lead la evalúa con los
+criterios del README (si el código vulnerable se alcanza desde internet y si puede afectar
+datos de pacientes) y elige uno de tres caminos: cambiar la dependencia o la imagen base,
+mitigarla de otra forma, o pedir una excepción con esa evaluación escrita. Una HIGH sin parche
+no bloquea, pero queda en el reporte del job. En Trivy son dos pasadas: `--severity CRITICAL`
+sin `--ignore-unfixed`, y `--severity HIGH` con `--ignore-unfixed`.
+
 **Excepciones.** Siguen el proceso del README: la propone el DevSecOps Lead, la aprueba la
-Product Owner, y queda en la descripción del PR con su motivo y su **fecha de vencimiento**.
-Cada herramienta la registra a su manera: un archivo VEX en Trivy, el `skip` comentado en el
-mismo archivo en Checkov, y `.zap/rules.tsv` en ZAP. La sesión propone un ADR por cada
-excepción. Aquí no: un ADR registra una decisión que dura, y una excepción tiene fecha de
-vencimiento.
+Product Owner y queda en la descripción del PR. Para que ninguna quede olvidada:
+
+- **Cada excepción tiene un issue**, con la etiqueta `seguridad`, asignado al DevSecOps Lead,
+  con la evaluación de riesgo y la **fecha de vencimiento en el título**. Los issues abiertos
+  con esa etiqueta son el registro de las excepciones vigentes. El issue se cierra cuando la
+  excepción se elimina.
+- **El vencimiento no pasa el plazo de corrección del README** para esa severidad: 7 días para
+  una crítica, 30 para una alta y 90 para una media. Al vencer, se corrige el hallazgo o se
+  vuelve a aprobar la excepción con una evaluación nueva, por el mismo proceso.
+- **En Trivy, la excepción vence sola.** Va en `.trivyignore.yaml`, con el motivo en
+  `statement` y la fecha en `expired_at`. Pasada esa fecha, Trivy deja de ignorar el hallazgo
+  y el pipeline vuelve a bloquear. Por eso se usa este archivo y no el VEX que menciona el
+  README: la fecha la hace cumplir la herramienta. Trivy marca este formato como experimental;
+  si cambia, se ajusta el archivo.
+- **En Checkov y ZAP la excepción no vence sola.** Va en el `skip` comentado del mismo archivo
+  (Checkov) o en `.zap/rules.tsv` (ZAP), y el seguimiento lo da su issue, que dice dónde está.
+
+La sesión propone un ADR por cada excepción. Aquí no: un ADR registra una decisión que dura, y
+una excepción tiene fecha de vencimiento.
 
 ### 5. Acciones fijadas por SHA
 
@@ -167,18 +189,28 @@ tj-actions. Las acciones que hoy van por etiqueta en `ci.yml` y `publish-image.y
 modificar cada workflow. Cuando no quede ninguna, la dueña del repositorio puede activar la
 política de GitHub Actions que exige SHA, y el repositorio deja de aceptar etiquetas.
 
+**Dependabot mantiene los SHA al día.** `.github/dependabot.yml` activa las actualizaciones del
+ecosistema `github-actions`, una vez por semana. Dependabot entiende los SHA: propone el commit
+nuevo y actualiza el comentario de versión. Cada propuesta llega como Pull Request y pasa por
+las mismas reglas que cualquier otro, los checks obligatorios y dos aprobaciones. Nunca se
+fusiona sola.
+
 ### 6. Orden en `publish-image.yml`
 
 Al fusionar en `main`:
 
 1. Construir y publicar la imagen en GHCR.
-2. Generar el SBOM (#93).
-3. Firmar la imagen.
-4. Verificar la firma.
-5. Adjuntar la provenance.
-6. Proponer el nuevo digest al repositorio GitOps (#113).
+2. **Escanear con Trivy la imagen publicada, por su digest**, con los umbrales del punto 4.
+3. Generar el SBOM (#93).
+4. Firmar la imagen.
+5. Verificar la firma.
+6. Adjuntar la provenance.
+7. Proponer el nuevo digest al repositorio GitOps (#113).
 
-Si cualquier paso falla, los siguientes no corren.
+Si cualquier paso falla, los siguientes no corren. **La promoción va al final y depende de todo
+lo anterior.** Si queda en otro job, ese job declara `needs:` sobre el de publicación, y no
+corre si fallaron el escaneo, la firma, la verificación o la provenance. Una imagen que no pasó
+el escaneo queda en GHCR sin firma, y Kyverno no la deja entrar al clúster.
 
 ### 7. Retención
 
@@ -196,6 +228,8 @@ poder verificar qué software tomó cada decisión.
   revisores.
 - **Una imagen subida a mano a GHCR no entra al clúster**, aunque quien la suba tenga un token
   válido.
+- **Lo que se firma es lo que se escaneó.** El escaneo de `main` y la firma usan el mismo
+  digest.
 - **Cierra la amenaza T3 del threat model**, cuando se fusionen el #115 y el #118.
 - **Estándares abiertos.** Sigstore y SLSA funcionan con cualquier registro OCI y cualquier
   Kubernetes, coherente con no haber elegido proveedor (ADR 0003 y 0005).
@@ -221,12 +255,17 @@ poder verificar qué software tomó cada decisión.
   tiene que actualizar la policy de Kyverno y el paso de verificación.
 - **Kyverno solo verifica nuestra imagen.** Las de terceros, como Traefik, Argo CD, Kyverno o
   Falco, no van firmadas por nosotros. Se instalan con Helm, en versiones fijas.
-- **La imagen que se escanea en el PR no es, byte a byte, la que se firma.** El PR escanea una
-  imagen construida en el pipeline, y `main` la vuelve a construir para publicarla. Las dos
-  salen del mismo código, con imágenes base fijadas por digest, así que su contenido coincide.
-  La mejora posible es escanear también la imagen publicada, por su digest, antes de firmarla.
-- **Un SHA no se actualiza solo.** Fijar las acciones las congela. El DevSecOps Lead decide si
-  activa Dependabot para GitHub Actions, que entiende los SHA y propone la actualización.
+- **Las dependencias transitivas no están fijadas.** `requirements.txt` fija FastAPI y Uvicorn,
+  pero no lo que ellas instalan, como Starlette o Pydantic. Dos construcciones del mismo commit
+  pueden traer versiones distintas, así que la imagen escaneada en el PR puede no tener el mismo
+  contenido que la publicada. Por eso la publicada se vuelve a escanear antes de firmarla (punto
+  6). Fijar las transitivas con hashes, por ejemplo con `pip-compile --generate-hashes`, haría
+  reproducible el build. Queda como mejora.
+- **Un build de `main` puede fallar aunque su PR haya pasado**, si entremedio cambió una
+  dependencia transitiva o se publicó una vulnerabilidad nueva. Es lo buscado: no se firma lo
+  que no pasó el escaneo. Lo corrige un PR nuevo.
+- **Dependabot suma Pull Requests que revisar**, uno por cada acción que se actualiza. Es el
+  costo de que ninguna actualización entre sin revisión.
 
 ## Alternativas descartadas
 
