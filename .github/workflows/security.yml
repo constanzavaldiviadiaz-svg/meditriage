@@ -23,7 +23,7 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Instalar Semgrep
         run: python -m pip install semgrep==1.187.0
@@ -61,3 +61,40 @@ jobs:
 
       - name: Buscar secretos
         run: gitleaks git . --redact --exit-code 1 --log-opts="--all"
+
+  sca:
+    name: Analisis de dependencias e imagen con Trivy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Escanear dependencias de produccion
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: 'v0.70.0'
+          scan-type: fs
+          scan-ref: '.'
+          scanners: vuln
+          vuln-type: library
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
+
+      - name: Construir imagen para analisis
+        run: docker build -t meditriage-api:security-scan .
+
+      - name: Escanear imagen Docker
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: 'v0.70.0'
+          scan-type: image
+          image-ref: 'meditriage-api:security-scan'
+          scanners: vuln
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
+          exit-code: '1'
+          format: table
