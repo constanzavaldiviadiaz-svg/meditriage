@@ -32,12 +32,20 @@ helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
 helm install metrics-server metrics-server/metrics-server --namespace kube-system \
   --values cluster-local/metrics-server.yaml --wait
 
-# 4. Crear el namespace y el Secret de ejemplo con Terraform
+# 4. Levantar PostgreSQL, fuera del clúster: pasos 1 y 2 de db/README.md
+
+# 5. Crear el namespace y los Secrets con Terraform, con las claves del paso 4
+export TF_VAR_clave_meditriage_app=$CLAVE_MEDITRIAGE_APP
+export TF_VAR_clave_auditoria_escritor=$CLAVE_AUDITORIA_ESCRITOR
 terraform -chdir=terraform init
 terraform -chdir=terraform apply
 ```
 
-**Sobre el paso 4:** según el ADR 0005, el namespace y los Secrets los crea Terraform; los
+**Sobre el paso 4:** la aplicación guarda los pacientes y la auditoría en PostgreSQL, que
+corre **fuera del clúster**, en su propio contenedor, como en producción (ADR 0005). Los
+detalles están en [db/README.md](../db/README.md).
+
+**Sobre el paso 5:** según el ADR 0005, el namespace y los Secrets los crea Terraform; los
 manifiestos de `k8s/` no los declaran. `apply` muestra lo que va a crear y pide confirmar
 escribiendo `yes`.
 
@@ -46,14 +54,16 @@ El estado de Terraform se guarda en HCP Terraform, así que la primera vez neces
 1. Que Matías Sepúlveda te invite a la organización `meditriage-dev-byretro`.
 2. Correr `terraform login`, que abre el navegador para generar tu token.
 
-Si todavía no tienes ese acceso, crea el namespace a mano para seguir trabajando:
-`kubectl create namespace meditriage`.
+Si todavía no tienes ese acceso, crea el namespace a mano para seguir trabajando,
+`kubectl create namespace meditriage`, y los Secrets como indica
+[db/README.md](../db/README.md).
 
 ## Desplegar MediTriage
 
 ```bash
 kubectl apply -k k8s/
 kubectl -n meditriage rollout status deployment/meditriage-api
+kubectl -n meditriage rollout status deployment/meditriage-worker-auditoria
 ```
 
 ## Comprobar que funciona
@@ -78,5 +88,5 @@ localhost:8088  ──▶  puerto 30080 del nodo  ──▶  Traefik  ──▶ 
 kind delete cluster --name meditriage
 ```
 
-Se borra todo, incluidos los pacientes de prueba: mientras la app no tenga base de datos, los
-guarda en memoria.
+Los pacientes y la auditoría no se borran: viven en el contenedor `meditriage-postgres`, fuera
+del clúster. Para borrarlos también, sigue "Empezar de cero" en [db/README.md](../db/README.md).

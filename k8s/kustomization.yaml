@@ -6,6 +6,7 @@ namespace: meditriage
 
 resources:
   - deployment.yaml
+  - worker-auditoria.yaml
   - service.yaml
   - ingress.yaml
   - configmap.yaml

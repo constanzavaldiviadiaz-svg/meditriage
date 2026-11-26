@@ -1,4 +1,4 @@
-"""Pruebas de POST /v1/pacientes y de las sondas de salud.
+"""Pruebas de POST /v1/pacientes, de las sondas de salud y de la persistencia.
 
 Cada prueba corresponde a un escenario de docs/scenarios/hu01.feature o a una regla del
 contrato api/openapi.yaml.
@@ -9,18 +9,15 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from src import bd
 from src.main import app
-from src.registro import almacen
+from tests.conftest import BASE_PRINCIPAL, admin
+
+pytestmark = pytest.mark.usefixtures("base_limpia")
 
 cliente = TestClient(app)
 
 URL_PROBLEMAS = "https://api.meditriage.example/problemas/"
-
-
-@pytest.fixture(autouse=True)
-def empezar_de_cero():
-    """Cada prueba parte con el almacén vacío."""
-    almacen.vaciar()
 
 
 def un_paciente(rut="12345678-5", consentimiento="otorgado"):
@@ -48,6 +45,20 @@ def test_health():
 
 def test_ready():
     assert cliente.get("/ready").status_code == 200
+
+
+def test_ready_responde_503_si_no_hay_base_de_datos(monkeypatch):
+    # Un puerto donde no escucha nadie: la base no está disponible.
+    monkeypatch.setenv("BASE_DATOS_URL", "postgresql://nadie@127.0.0.1:1/nada?connect_timeout=1")
+    bd.cerrar()
+    try:
+        respuesta = cliente.get("/ready")
+    finally:
+        monkeypatch.undo()
+        bd.cerrar()
+
+    assert respuesta.status_code == 503
+    assert respuesta.json()["type"] == URL_PROBLEMAS + "servicio-no-disponible"
 
 
 # --- Camino feliz -----------------------------------------------------------------------
@@ -82,6 +93,77 @@ def test_toda_respuesta_lleva_trace_id():
 def test_se_respeta_el_trace_id_del_cliente():
     respuesta = cliente.get("/health", headers={"X-Trace-Id": "abc123"})
     assert respuesta.headers["X-Trace-Id"] == "abc123"
+
+
+def test_un_trace_id_demasiado_largo_se_recorta():
+    respuesta = cliente.get("/health", headers={"X-Trace-Id": "x" * 500})
+    assert respuesta.headers["X-Trace-Id"] == "x" * 64
+
+
+# --- Persistencia -----------------------------------------------------------------------
+
+
+def test_el_paciente_queda_guardado_en_postgresql():
+    paciente = registrar(un_paciente()).json()
+
+    with admin(BASE_PRINCIPAL) as conexion:
+        fila = conexion.execute(
+            "SELECT p.rut, c.estado FROM identidad.paciente p"
+            " JOIN identidad.consentimiento c USING (paciente_id) WHERE paciente_id = %s",
+            (paciente["pacienteId"],),
+        ).fetchone()
+    assert fila == ("12345678-5", "otorgado")
+
+
+def test_los_pacientes_sobreviven_a_un_reinicio():
+    primero = registrar(un_paciente()).json()
+    bd.cerrar()  # como al reiniciar el pod: se pierden todas las conexiones
+
+    respuesta = registrar(un_paciente())
+
+    assert respuesta.status_code == 409
+    assert respuesta.json()["pacienteId"] == primero["pacienteId"]
+
+
+def test_la_idempotencia_sobrevive_a_un_reinicio():
+    clave = uuid4()
+    primera = registrar(un_paciente(), clave)
+    bd.cerrar()
+
+    segunda = registrar(un_paciente(), clave)
+
+    assert segunda.status_code == 201
+    assert segunda.json() == primera.json()
+
+
+def test_dos_registros_simultaneos_del_mismo_rut(monkeypatch):
+    primero = registrar(un_paciente()).json()
+    # Otra réplica registró el mismo RUT entre la revisión y el guardado: la revisión no lo
+    # ve, pero la base lo rechaza por la restricción UNIQUE.
+    from src.registro import almacen
+
+    buscar = almacen.buscar_id_por_rut
+    llamadas = []
+
+    def no_lo_ve_la_primera_vez(rut):
+        llamadas.append(rut)
+        return None if len(llamadas) == 1 else buscar(rut)
+
+    monkeypatch.setattr(almacen, "buscar_id_por_rut", no_lo_ve_la_primera_vez)
+
+    respuesta = registrar(un_paciente())
+
+    assert respuesta.status_code == 409
+    assert respuesta.json()["pacienteId"] == primero["pacienteId"]
+
+
+def test_la_clave_de_idempotencia_no_guarda_el_rut_ni_el_nombre():
+    registrar(un_paciente())
+
+    with admin(BASE_PRINCIPAL) as conexion:
+        fila = conexion.execute("SELECT * FROM identidad.solicitud_registro").fetchone()
+    assert "12345678" not in str(fila)
+    assert "Paciente de Prueba" not in str(fila)
 
 
 # --- Reglas del dominio (422) -----------------------------------------------------------
