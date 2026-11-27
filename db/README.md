@@ -5,7 +5,7 @@ MediTriage usa dos bases PostgreSQL (ADR 0004):
 | Base | Qué guarda | Quién entra |
 |---|---|---|
 | `meditriage` | Identidad (RUT, nombre, consentimiento), clínico y la outbox | La API y el worker, con el rol `meditriage_app` |
-| `meditriage_auditoria` | El registro de auditoría, append-only | El worker, con `auditoria_escritor` (solo `INSERT`); el auditor, con `auditoria_lector` (solo `SELECT`) |
+| `meditriage_auditoria` | El registro de auditoría, append-only | El worker, con `auditoria_escritor` (solo `INSERT`); la API, con `auditoria_lector` (solo `SELECT`), para consultar las decisiones (HU05) |
 
 La estructura está en [`sql/`](sql/). Los mismos scripts crean las bases de las pruebas
 (`tests/conftest.py`), así que lo que se prueba es lo que se despliega.
@@ -64,6 +64,7 @@ para consultarla a mano se usa `docker exec`, como en "Revisar la auditoría".
 ```bash
 export TF_VAR_clave_meditriage_app=$CLAVE_MEDITRIAGE_APP
 export TF_VAR_clave_auditoria_escritor=$CLAVE_AUDITORIA_ESCRITOR
+export TF_VAR_clave_auditoria_lector=$CLAVE_AUDITORIA_LECTOR
 terraform -chdir=terraform apply
 ```
 
@@ -75,6 +76,8 @@ kubectl -n meditriage create secret generic meditriage-bd \
   --from-literal=BASE_DATOS_URL="postgresql://meditriage_app:$CLAVE_MEDITRIAGE_APP@meditriage-postgres:5432/meditriage"
 kubectl -n meditriage create secret generic meditriage-auditoria \
   --from-literal=AUDITORIA_URL="postgresql://auditoria_escritor:$CLAVE_AUDITORIA_ESCRITOR@meditriage-postgres:5432/meditriage_auditoria"
+kubectl -n meditriage create secret generic meditriage-auditoria-lectura \
+  --from-literal=AUDITORIA_LECTURA_URL="postgresql://auditoria_lector:$CLAVE_AUDITORIA_LECTOR@meditriage-postgres:5432/meditriage_auditoria"
 ```
 
 ## Revisar la auditoría
@@ -112,6 +115,10 @@ SQL
 Después repite el paso 3 y reinicia los pods: `kubectl -n meditriage rollout restart deployment`.
 
 ## Empezar de cero
+
+No hay herramienta de migraciones: los scripts de `sql/` crean el esquema una sola vez. **Si
+cambia el esquema** (por ejemplo, al actualizar la rama), hay que recrear las bases con este
+paso y volver a levantarlas (paso 2).
 
 Borra el contenedor **y el volumen**. Se pierden todos los datos, también la auditoría:
 

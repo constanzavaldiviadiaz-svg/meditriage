@@ -39,9 +39,11 @@ son referenciales y deberán ajustarse durante su implementación.
 | Token HCP Terraform | Almacén local de credenciales de Terraform o mecanismo seguro de CI | Titular autorizado en HCP | DevSecOps Lead y titular del token | 90 días | Integración HCP configurada; token no verificado |
 | Credenciales Kubernetes | Archivo local ~/.kube/config | Administrador del clúster | DevSecOps Lead | 90 días en producción, según mecanismo de autenticación | Mecanismo configurado |
 | AI_API_KEY | Variable sensitive de HCP y Secret de Kubernetes | Administrador autorizado del servicio de IA | DevSecOps Lead | 90 días | Planificado |
-| POSTGRES_USER / POSTGRES_PASSWORD | Variable sensitive de HCP y Secret de Kubernetes | Administrador de PostgreSQL | DevSecOps Lead | 90 días | Planificado |
+| Rol `meditriage_app` (`BASE_DATOS_URL`) | Variable sensitive de HCP (`TF_VAR_clave_meditriage_app`) y Secret `meditriage-bd` | Terraform (`terraform/bd.tf`) | DevSecOps Lead | 90 días | Implementado (#142). Lo usan la API y el worker |
 | REDIS_PASSWORD | Variable sensitive de HCP y Secret de Kubernetes | Administrador de Redis | DevSecOps Lead | 90 días | Planificado |
-| AUDIT_DB_USER / AUDIT_DB_PASSWORD | Variable sensitive de HCP y Secret de Kubernetes | Administrador del almacén de auditoría | DevSecOps Lead | 90 días | Planificado |
+| Rol `auditoria_escritor` (`AUDITORIA_URL`), solo `INSERT` | Variable sensitive de HCP (`TF_VAR_clave_auditoria_escritor`) y Secret `meditriage-auditoria` | Terraform (`terraform/bd.tf`) | DevSecOps Lead | 90 días | Implementado (#142). Solo el worker de auditoría |
+| Rol `auditoria_lector` (`AUDITORIA_LECTURA_URL`), solo `SELECT` | Variable sensitive de HCP (`TF_VAR_clave_auditoria_lector`) y Secret `meditriage-auditoria-lectura` | Terraform (`terraform/bd.tf`) | DevSecOps Lead | 90 días | Implementado (#122). Solo la API, para consultar decisiones |
+| Administrador de PostgreSQL | Fuera del clúster: solo se usa al crear las bases (`db/README.md`) | Quien administra la base | DevSecOps Lead | 90 días | Implementado; no entra al clúster |
 | Tokens OAuth2 | Proveedor de identidad y cliente autorizado | Proveedor de identidad | Proveedor de identidad, supervisado por DevSecOps Lead | Según expiración y política de sesión | Diseñado; validación pendiente |
 | DEMO_API_KEY | Secret meditriage-example-secret de Kubernetes | Terraform | DevSecOps Lead | No aplica | Confirmado; valor ficticio |
 

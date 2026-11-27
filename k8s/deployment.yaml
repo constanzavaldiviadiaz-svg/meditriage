@@ -38,13 +38,19 @@ spec:
                 configMapKeyRef:
                   name: meditriage-config
                   key: AMBIENTE
-            # Solo la base principal. La credencial de auditoría la tiene el worker
-            # (worker-auditoria.yaml), no la API.
+            # La base principal, y la auditoría solo para leer (consulta de decisiones, HU05).
+            # La credencial que escribe en la auditoría la tiene solo el worker
+            # (worker-auditoria.yaml).
             - name: BASE_DATOS_URL
               valueFrom:
                 secretKeyRef:
                   name: meditriage-bd
                   key: BASE_DATOS_URL
+            - name: AUDITORIA_LECTURA_URL
+              valueFrom:
+                secretKeyRef:
+                  name: meditriage-auditoria-lectura
+                  key: AUDITORIA_LECTURA_URL
           resources:
             requests:
               cpu: "200m"
