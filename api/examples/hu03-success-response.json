@@ -1,6 +1,21 @@
 {
-  "triage_id": "b1a2c3d4-5678-90ab-cdef-1234567890ab",
-  "suggested_esi_level": 2,
-  "ai_justification": "Posible compromiso isquémico agudo basado en dolor torácico irradiado y taquicardia.",
-  "processing_time_ms": 1250
+  "evaluacionId": "7c1e2f3a-4b5d-4e6f-8a9b-0c1d2e3f4a5b",
+  "encuentroId": "2b8f6d1c-9e4a-4f7b-8c3d-5a6e7f8091a2",
+  "resultado": "sugerencia_ia",
+  "categoriaEsi": 2,
+  "justificacion": {
+    "resumen": "Dolor torácico con presión arterial elevada y saturación limítrofe.",
+    "factores": [
+      {
+        "factor": "Dolor torácico",
+        "descripcion": "Síntoma de alto riesgo en el protocolo ESI."
+      },
+      {
+        "factor": "Presión arterial 182/112",
+        "descripcion": "Sobre el umbral de alerta."
+      }
+    ]
+  },
+  "duracionMs": 1840,
+  "generadaEn": "2026-10-08T14:22:31Z"
 }
