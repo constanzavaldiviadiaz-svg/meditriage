@@ -15,7 +15,7 @@ spec:
       labels:
         app: meditriage
     spec:
-      automountServiceAccountToken: true
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
