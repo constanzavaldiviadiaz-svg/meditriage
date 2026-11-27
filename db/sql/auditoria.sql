@@ -46,6 +46,11 @@ CREATE TABLE auditoria.registro (
 
 -- El hash de un registro: su contenido completo más el hash del anterior. Las fechas se
 -- escriben siempre en UTC, para que el resultado no dependa de la zona horaria de la sesión.
+-- Para consultar las decisiones (HU05) sin recorrer toda la tabla: las evaluaciones se buscan
+-- por tipo en orden de llegada, y sus confirmaciones por el encuentro al que pertenecen.
+CREATE INDEX registro_tipo ON auditoria.registro (tipo, secuencia);
+CREATE INDEX registro_aggregate ON auditoria.registro (aggregate_id);
+
 CREATE FUNCTION auditoria.calcular_hash(r auditoria.registro) RETURNS char(64)
 LANGUAGE sql STABLE
 SET search_path = pg_catalog

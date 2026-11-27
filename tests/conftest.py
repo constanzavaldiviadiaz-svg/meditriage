@@ -77,6 +77,7 @@ def bases():
 
     os.environ["BASE_DATOS_URL"] = url(BASE_PRINCIPAL, "meditriage_app")
     os.environ["AUDITORIA_URL"] = url(BASE_AUDITORIA, "auditoria_escritor")
+    os.environ["AUDITORIA_LECTURA_URL"] = url(BASE_AUDITORIA, "auditoria_lector")
     bd.cerrar()
     yield
     bd.cerrar()
