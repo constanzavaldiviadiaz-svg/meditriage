@@ -64,6 +64,31 @@ curl http://localhost:8088/health    # entra por Traefik, el Ingress
 kubectl top pods -n meditriage       # consumo de CPU y memoria (metrics-server)
 ```
 
+## Detección con Falco
+
+Falco vigila lo que hacen los contenedores de MediTriage mientras corren (#118). Las reglas,
+qué detectan y a quién se avisa están en [falco/README.md](../falco/README.md).
+
+```bash
+helm repo add falcosecurity https://falcosecurity.github.io/charts
+helm install falco falcosecurity/falco --version 9.2.2 --namespace falco --create-namespace \
+  --values falco/values.yaml \
+  --set-file "customRules.rules-custom\.yaml=falco/rules-custom.yaml" --wait
+
+# Probar las tres reglas
+bash falco/probar-reglas.sh
+```
+
+Si cambias las reglas, repite el mismo comando con `helm upgrade` en vez de `helm install`.
+
+Falco usa el driver `modern_ebpf`, que necesita un kernel con BTF. El de Docker Desktop lo
+trae. Para confirmar que cargó, busca en el log la línea `Opening 'syscall' source with
+modern BPF probe`:
+
+```bash
+kubectl logs -n falco ds/falco -c falco | grep "modern BPF"
+```
+
 ## Cómo llega una solicitud a la aplicación
 
 ```
