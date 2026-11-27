@@ -42,7 +42,7 @@ Representa el sistema MediTriage, sus usuarios principales y los servicios exter
 
 ### Nivel 2 — Diagrama de contenedores
 
-Representa los principales componentes internos del sistema, sus responsabilidades y las tecnologías utilizadas.
+Representa los contenedores del sistema: las aplicaciones y bases de datos que lo forman, sus responsabilidades y las tecnologías que usan.
 
 ![Diagrama C4 Nivel 2 — Contenedores](docs/c4/l2-container.png)
 
