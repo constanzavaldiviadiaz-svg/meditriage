@@ -6,7 +6,6 @@ metadata:
   labels:
     app: meditriage
 spec:
-  replicas: 3
   selector:
     matchLabels:
       app: meditriage
@@ -40,11 +39,11 @@ spec:
                   key: AMBIENTE
           resources:
             requests:
-              cpu: "200m"
-              memory: "256Mi"
+              cpu: "100m"
+              memory: "128Mi"
             limits:
-              cpu: "1"
-              memory: "512Mi"
+              cpu: "500m"
+              memory: "256Mi"
           readinessProbe:
             httpGet:
               path: /ready
