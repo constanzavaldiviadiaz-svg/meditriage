@@ -61,3 +61,32 @@ jobs:
 
       - name: Buscar secretos
         run: gitleaks git . --redact --exit-code 1 --log-opts="--all"
+
+  iac-scan:
+    name: Analisis de infraestructura con Checkov
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Escanear infraestructura Terraform
+        uses: bridgecrewio/checkov-action@a32f8b5c5c7c958bc38947c65dfe139debaf0607
+        with:
+          directory: terraform/
+          framework: terraform
+          soft_fail: "false"
+          compact: "true"
+          quiet: "true"
+          output_format: cli
+
+      - name: Escanear manifiestos Kubernetes
+        if: success() || failure()
+        uses: bridgecrewio/checkov-action@a32f8b5c5c7c958bc38947c65dfe139debaf0607
+        with:
+          directory: k8s/
+          framework: kubernetes
+          soft_fail: "false"
+          compact: "true"
+          quiet: "true"
+          output_format: cli
