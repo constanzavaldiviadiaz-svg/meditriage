@@ -1,0 +1,64 @@
+# Policy de admisión de MediTriage: en el namespace meditriage solo corren imágenes firmadas por
+# nuestro pipeline (#118, ADR 0007).
+#
+# Qué exige: cada imagen de cada contenedor del pod, también los init y los efímeros (los de
+# `kubectl debug`), tiene que traer una firma Cosign keyless hecha por el workflow
+# publish-image.yml en la rama main de este repositorio. Kyverno comprueba la firma contra el
+# certificado de Fulcio y el registro de transparencia de Sigstore (Rekor).
+#
+# Por qué todas las imágenes y no solo la nuestra: una imagen de terceros, aunque sea legítima,
+# tampoco entra sin pasar por el pipeline, que la escanea con Trivy antes de firmarla.
+#
+# Por qué la identidad exacta y no un patrón: una firma hecha desde otra rama, otro workflow u
+# otro repositorio no debe servir. Firmar solo puede hacerlo publish-image.yml al publicar desde
+# main, después de las revisiones del PR.
+#
+# Única excepción: la prueba de Falco (falco/probar-reglas.sh) necesita una imagen con shell.
+# El script crea una PolicyException solo para su pod y la borra al terminar.
+#
+# Instalación y prueba: cluster-local/README.md, sección "Admisión con Kyverno".
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: require-image-signature
+  annotations:
+    policies.kyverno.io/title: Exigir imágenes firmadas por el pipeline de MediTriage
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions: [Deny]
+  # Si Kyverno no responde, el pod no entra: una policy de seguridad no se salta por un corte.
+  failurePolicy: Fail
+  webhookConfiguration:
+    # La verificación consulta GHCR y Rekor. 30 s es el máximo que admite Kubernetes.
+    timeoutSeconds: 30
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [meditriage]
+  matchImageReferences:
+    - glob: "*"
+  attestors:
+    - name: pipeline
+      cosign:
+        keyless:
+          identities:
+            - subject: https://github.com/constanzavaldiviadiaz-svg/meditriage/.github/workflows/publish-image.yml@refs/heads/main
+              issuer: https://token.actions.githubusercontent.com
+        ctlog:
+          url: https://rekor.sigstore.dev
+  validations:
+    - message: >-
+        La imagen no tiene una firma válida del pipeline de MediTriage (publish-image.yml en
+        main). Solo se despliegan imágenes publicadas por el pipeline. Ver ADR 0007.
+      expression: >-
+        images.containers.map(image, verifyImageSignatures(image, [attestors.pipeline])).all(e, e > 0) &&
+        images.initContainers.map(image, verifyImageSignatures(image, [attestors.pipeline])).all(e, e > 0) &&
+        images.ephemeralContainers.map(image, verifyImageSignatures(image, [attestors.pipeline])).all(e, e > 0)

@@ -1,0 +1,25 @@
+# Valores del chart falcosecurity/falco 9.2.2 (Falco 0.45.2) para el clúster local (#118).
+#
+# Las reglas propias no se copian aquí: se pasan al instalar, desde falco/rules-custom.yaml,
+# para que exista una sola copia. Ver cluster-local/README.md.
+
+driver:
+  # Docker Desktop (WSL2) trae un kernel con BTF, que es lo que necesita este driver: no
+  # hay que compilar ni descargar un módulo del kernel.
+  kind: modern_ebpf
+
+# Las alertas salen en el log del pod apenas ocurren, sin esperar a llenar un búfer.
+tty: true
+
+falco:
+  # Que se informen todas las reglas que coinciden con un evento, no solo la primera. Con el
+  # valor por defecto (first), las reglas de Falco se evalúan antes que las nuestras y las
+  # tapan: una conexión a la API de Kubernetes salía como Notice de una regla por defecto, y
+  # la nuestra, que es Error y por lo tanto un incidente, no se informaba. Cuesta algo de
+  # rendimiento, que en un clúster de este tamaño no se nota.
+  rule_matching: all
+
+# Falcosidekick reenvía las alertas a otros servicios (Slack, Discord, correo). Queda
+# apagado: la ruta de alerta está en falco/README.md y por ahora no necesita un webhook.
+falcosidekick:
+  enabled: false

@@ -1,0 +1,132 @@
+# Reglas propias de MediTriage para Falco (#118).
+#
+# Falco observa lo que hacen los contenedores mientras corren y alerta cuando algo no
+# calza con lo esperado. Estas tres reglas vigilan los contenedores de la aplicación (la API
+# y el worker de auditoría, que usan la misma imagen), cuyo comportamiento normal es muy
+# acotado: un solo proceso, python3, que se conecta a PostgreSQL y al servicio de IA.
+#
+# Cualquier alerta de estas reglas es un incidente. La ruta de alerta está en
+# falco/README.md.
+#
+# Los contenedores se identifican por namespace y nombre, no por imagen, para que las reglas
+# funcionen igual con la imagen de GHCR y con la que se carga en kind.
+
+# --- Qué se vigila -----------------------------------------------------------------------
+
+- list: meditriage_contenedores
+  items: [api, worker]
+
+- macro: meditriage_contenedor
+  condition: >
+    (container.id != host
+     and k8s.ns.name = "meditriage"
+     and container.name in (meditriage_contenedores))
+
+- macro: meditriage_proceso_nuevo
+  condition: (evt.type in (execve, execveat))
+
+# El intérprete de la imagen. La 3.13 es por la migración del #143.
+- list: meditriage_interpretes
+  items: [python3, python3.11, python3.13]
+
+- list: meditriage_shells
+  items: [sh, bash, ash, dash, zsh, ksh, csh, tcsh, fish, busybox]
+
+# Para entrar a un contenedor, runc ejecuta dentro de él una copia de sí mismo ("runc
+# init"), que aparece como un proceso con nombre de número (por ejemplo "6"). Ocurre al
+# arrancar el contenedor y en cada kubectl exec. No es la aplicación. Si un atacante usara un
+# programa llamado runc, ese programa dispararía la regla 2 al ejecutarse.
+- macro: meditriage_runc_init
+  condition: (proc.pname = runc and proc.args = init)
+
+# Solo en kind: al crear cada contenedor, el nodo corre un hook (/kind/bin/mount-product-...)
+# que lanza jq y cp dentro del contenedor. No existe en un clúster gestionado. Se excluye solo
+# si el hook lo lanzó runc, una cadena que nadie puede fabricar desde dentro del contenedor.
+- macro: meditriage_hook_de_kind
+  condition: >
+    ((proc.name = mount-product-f and proc.pname startswith "runc:")
+     or (proc.aname[1] = mount-product-f and proc.aname[2] startswith "runc:"))
+
+# --- Regla 1: un shell -------------------------------------------------------------------
+
+- rule: Shell en un contenedor de MediTriage
+  desc: >
+    La imagen es distroless y no trae shell. Si aparece uno, alguien lo metió: es casi
+    seguro un compromiso del contenedor.
+  condition: >
+    meditriage_proceso_nuevo
+    and meditriage_contenedor
+    and proc.name in (meditriage_shells)
+    and not meditriage_hook_de_kind
+  output: >
+    Shell en un contenedor de MediTriage
+    (contenedor=%container.name pod=%k8s.pod.name proceso=%proc.name padre=%proc.pname
+    comando=%proc.cmdline usuario=%user.uid imagen=%container.image.repository)
+  priority: CRITICAL
+  tags: [meditriage, container, shell, mitre_execution]
+
+# --- Regla 2: un proceso que no es python3 -----------------------------------------------
+
+- rule: Proceso inesperado en un contenedor de MediTriage
+  desc: >
+    El único proceso legítimo es el intérprete de Python. Otro programa puede ser una
+    herramienta de ataque o un minero. Los shells se excluyen porque ya los cubre la regla
+    anterior, con más gravedad.
+  condition: >
+    meditriage_proceso_nuevo
+    and meditriage_contenedor
+    and not proc.name in (meditriage_interpretes)
+    and not proc.name in (meditriage_shells)
+    and not meditriage_runc_init
+    and not meditriage_hook_de_kind
+  output: >
+    Proceso inesperado en un contenedor de MediTriage
+    (contenedor=%container.name pod=%k8s.pod.name proceso=%proc.name padre=%proc.pname
+    comando=%proc.cmdline usuario=%user.uid imagen=%container.image.repository)
+  priority: ERROR
+  tags: [meditriage, container, process, mitre_execution]
+
+# --- Regla 3: una conexión a un destino no autorizado ------------------------------------
+
+- list: meditriage_loopback
+  items: ['"127.0.0.0/8"']
+
+- macro: meditriage_conexion_saliente
+  condition: >
+    (evt.type = connect
+     and (fd.typechar = 4 or fd.typechar = 6)
+     and fd.sip != "0.0.0.0"
+     and not fd.snet in (meditriage_loopback)
+     and (evt.rawres >= 0 or evt.res = EINPROGRESS))
+
+# El Registro Civil todavía no está integrado. Cuando lo esté, se reemplaza esta condición
+# por su dominio, por ejemplo: (fd.sport = 443 and fd.sip.name = "<dominio>").
+- macro: meditriage_destino_registro_civil
+  condition: (evt.num = 0)
+
+# Destinos legítimos:
+# - DNS (53), para resolver los nombres de los servicios.
+# - PostgreSQL (5432): la base principal y la de auditoría (ADR 0004).
+# - El servicio de IA por HTTPS (ADR 0008).
+- macro: meditriage_destino_permitido
+  condition: >
+    (fd.sport = 53
+     or fd.sport = 5432
+     or (fd.sport = 443 and fd.sip.name = "api.anthropic.com")
+     or meditriage_destino_registro_civil)
+
+- rule: Conexion saliente no autorizada desde MediTriage
+  desc: >
+    Los datos clínicos solo pueden salir hacia el servicio de IA (ADR 0002 y 0008). Una
+    conexión a otro destino puede ser alguien llevándose datos de pacientes.
+  condition: >
+    meditriage_conexion_saliente
+    and meditriage_contenedor
+    and not meditriage_destino_permitido
+  output: >
+    Conexion saliente no autorizada desde MediTriage
+    (contenedor=%container.name pod=%k8s.pod.name proceso=%proc.name
+    destino=%fd.sip:%fd.sport nombre=%fd.sip.name protocolo=%fd.l4proto
+    imagen=%container.image.repository)
+  priority: ERROR
+  tags: [meditriage, container, network, mitre_exfiltration]

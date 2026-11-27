@@ -64,6 +64,65 @@ curl http://localhost:8088/health    # entra por Traefik, el Ingress
 kubectl top pods -n meditriage       # consumo de CPU y memoria (metrics-server)
 ```
 
+## Detección con Falco
+
+Falco vigila lo que hacen los contenedores de MediTriage mientras corren (#118). Las reglas,
+qué detectan y a quién se avisa están en [falco/README.md](../falco/README.md).
+
+```bash
+helm repo add falcosecurity https://falcosecurity.github.io/charts
+helm install falco falcosecurity/falco --version 9.2.2 --namespace falco --create-namespace \
+  --values falco/values.yaml \
+  --set-file "customRules.rules-custom\.yaml=falco/rules-custom.yaml" --wait
+
+# Probar las tres reglas
+bash falco/probar-reglas.sh
+```
+
+Si cambias las reglas, repite el mismo comando con `helm upgrade` en vez de `helm install`.
+
+Falco usa el driver `modern_ebpf`, que necesita un kernel con BTF. El de Docker Desktop lo
+trae. Para confirmar que cargó, busca en el log la línea `Opening 'syscall' source with
+modern BPF probe`:
+
+```bash
+kubectl logs -n falco ds/falco -c falco | grep "modern BPF"
+```
+
+## Admisión con Kyverno
+
+Kyverno rechaza en el namespace `meditriage` toda imagen que no venga firmada por nuestro
+pipeline (#118, ADR 0007): solo entran las que publicó `publish-image.yml` desde `main`. La
+policy y el porqué de cada decisión están en
+[k8s/policies/require-signature.yaml](../k8s/policies/require-signature.yaml).
+
+```bash
+helm repo add kyverno https://kyverno.github.io/kyverno/
+helm install kyverno kyverno/kyverno --version 3.9.2 --namespace kyverno --create-namespace \
+  --set features.policyExceptions.enabled=true \
+  --set features.policyExceptions.namespace=kyverno --wait
+kubectl apply -f k8s/policies/require-signature.yaml
+
+# Probar: la imagen firmada entra; la sin firma y la de terceros se rechazan
+bash k8s/policies/probar-policy.sh
+```
+
+Las dos opciones `--set` activan las excepciones de Kyverno **solo en el namespace `kyverno`**.
+La única excepción que existe es la de la prueba de Falco, que el script crea y borra.
+
+**Imágenes construidas en local.** Una imagen hecha con `docker build` y cargada con
+`kind load` no está firmada, así que la policy la rechaza. Para probarla en el clúster, quita
+la policy y vuelve a aplicarla al terminar:
+
+```bash
+kubectl delete -f k8s/policies/require-signature.yaml
+# ... desplegar y probar la imagen local ...
+kubectl apply -f k8s/policies/require-signature.yaml
+```
+
+Los pods que ya estaban corriendo no se detienen al aplicar la policy: Kyverno revisa cada pod
+al crearlo, así que una imagen sin firma se rechaza la próxima vez que el pod se recree.
+
 ## Cómo llega una solicitud a la aplicación
 
 ```

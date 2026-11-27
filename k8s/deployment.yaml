@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: ghcr.io/constanzavaldiviadiaz-svg/meditriage-api@sha256:5bb8eb9ada9cda3fcbd9a4e13cba365b1d494ecc574109c8253e2f23b9c89907
+          image: ghcr.io/constanzavaldiviadiaz-svg/meditriage-api@sha256:967ad724ed7b9402f38bbca4705ee4051d8f049f1d6e23f37f7bfa45db22cf77
           securityContext:
             runAsNonRoot: true
             runAsUser: 65532

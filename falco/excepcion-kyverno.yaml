@@ -1,0 +1,24 @@
+# Excepción de Kyverno para el pod de prueba de Falco (falco/probar-reglas.sh). Nunca queda
+# aplicada: el script la crea antes de la prueba y la borra al terminar.
+#
+# Por qué hace falta: la policy require-image-signature (k8s/policies/) solo admite imágenes
+# firmadas por nuestro pipeline, y la prueba necesita una imagen con shell para hacer disparar
+# las reglas de Falco. Nuestra imagen es distroless y no trae shell.
+#
+# Por qué es acotada:
+# - Vale solo para un pod llamado falco-prueba en el namespace meditriage.
+# - Kyverno acepta excepciones solo en el namespace kyverno (cluster-local/README.md). Quien
+#   pueda crear pods en meditriage no puede crearse su propia excepción.
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: prueba-falco
+  namespace: kyverno
+spec:
+  policyRefs:
+    - name: require-image-signature
+      kind: ImageValidatingPolicy
+  matchConditions:
+    - name: solo-el-pod-de-prueba-de-falco
+      expression: >-
+        object.metadata.namespace == 'meditriage' && object.metadata.name == 'falco-prueba'
