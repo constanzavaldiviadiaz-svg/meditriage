@@ -76,7 +76,7 @@ jobs:
           echo "Image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/meditriage-api@${{ steps.publish.outputs.digest }}"
 
       - name: Generar SBOM de la imagen
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ghcr.io/${{ github.repository_owner }}/meditriage-api@${{ steps.publish.outputs.digest }}
           format: cyclonedx-json
