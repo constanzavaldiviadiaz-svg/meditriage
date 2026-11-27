@@ -10,6 +10,7 @@ Cómo levantar en tu computador el mismo clúster de Kubernetes que usa el equip
 | kind | Crea el clúster dentro de Docker | `winget install Kubernetes.kind` |
 | kubectl | Da órdenes al clúster | Viene con Docker Desktop |
 | Helm | Instala Traefik y metrics-server | `winget install Helm.Helm` |
+| Terraform 1.17 o superior | Crea el namespace y los Secrets | `winget install Hashicorp.Terraform` |
 
 Después de instalar con `winget`, cierra y vuelve a abrir la terminal.
 
@@ -31,13 +32,22 @@ helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
 helm install metrics-server metrics-server/metrics-server --namespace kube-system \
   --values cluster-local/metrics-server.yaml --wait
 
-# 4. Crear el namespace
-kubectl create namespace meditriage
+# 4. Crear el namespace y el Secret de ejemplo con Terraform
+terraform -chdir=terraform init
+terraform -chdir=terraform apply
 ```
 
-**Sobre el paso 4:** según el ADR 0005, el namespace lo crea Terraform (#71). Mientras no
-exista, se crea a mano con ese comando; cuando llegue Terraform, este paso se reemplaza por
-`terraform apply`.
+**Sobre el paso 4:** según el ADR 0005, el namespace y los Secrets los crea Terraform; los
+manifiestos de `k8s/` no los declaran. `apply` muestra lo que va a crear y pide confirmar
+escribiendo `yes`.
+
+El estado de Terraform se guarda en HCP Terraform, así que la primera vez necesitas:
+
+1. Que Matías Sepúlveda te invite a la organización `meditriage-dev-byretro`.
+2. Correr `terraform login`, que abre el navegador para generar tu token.
+
+Si todavía no tienes ese acceso, crea el namespace a mano para seguir trabajando:
+`kubectl create namespace meditriage`.
 
 ## Desplegar MediTriage
 
