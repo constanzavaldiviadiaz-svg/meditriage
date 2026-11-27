@@ -43,7 +43,7 @@ la enfermera una sugerencia de categoría ESI (1 a 5) acompañada de su justific
 
 ## Cómo correr la aplicación
 
-Requiere Python 3.11.
+Requiere Python 3.13.
 
 ```bash
 python -m venv .venv
