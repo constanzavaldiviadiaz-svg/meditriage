@@ -151,6 +151,19 @@ CREATE TABLE clinico.evaluacion (
   trace_id              varchar(64)
 );
 
+-- Categoría final: la decide la enfermera, no la IA (HU03). Una por encuentro; si se vuelve a
+-- confirmar, se reemplaza, y cada confirmación queda en la auditoría por su evento.
+-- confirmada_por es una referencia opaca a quien confirmó, nunca su nombre ni su RUT (R1).
+CREATE TABLE clinico.categoria_final (
+  encuentro_id         uuid PRIMARY KEY REFERENCES clinico.encuentro,
+  evaluacion_id        uuid NOT NULL REFERENCES clinico.evaluacion,
+  categoria_esi        smallint NOT NULL CHECK (categoria_esi BETWEEN 1 AND 5),
+  origen               varchar(30) NOT NULL,
+  justificacion_cambio varchar(1000),
+  confirmada_por       varchar(64),
+  confirmada_en        timestamptz NOT NULL
+);
+
 -- ---------------------------------------------------------------- Permisos
 
 GRANT USAGE ON SCHEMA identidad, clinico TO meditriage_app;
@@ -167,3 +180,4 @@ GRANT SELECT, INSERT ON clinico.signos_vitales, clinico.sintoma, clinico.alerta_
 -- Los síntomas se reemplazan en cada registro de datos clínicos.
 GRANT DELETE ON clinico.sintoma TO meditriage_app;
 GRANT SELECT, INSERT ON clinico.evaluacion TO meditriage_app;
+GRANT SELECT, INSERT, UPDATE ON clinico.categoria_final TO meditriage_app;

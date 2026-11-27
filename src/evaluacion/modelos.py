@@ -92,3 +92,17 @@ class DerivacionManual(BaseModel):
     motivo: Literal["timeout", "servicio_no_disponible", "respuesta_invalida"]
     duracionMs: int = Field(ge=0)
     generadaEn: datetime
+
+
+class ConfirmacionInput(BaseModel):
+    categoriaEsi: int = Field(ge=1, le=5)
+    justificacionCambio: str | None = Field(default=None, max_length=1000)
+
+
+class CategoriaFinal(BaseModel):
+    encuentroId: UUID
+    categoriaEsi: int
+    origen: Literal["confirmada_sugerencia_ia", "modificada_por_enfermera",
+                    "asignada_triage_manual"]
+    justificacionCambio: str | None
+    confirmadaEn: datetime

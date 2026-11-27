@@ -5,10 +5,13 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Request, Response
 
+from src import config
 from src.errores import Problema
-from src.evaluacion import datos_clinicos, encuentros
+from src.evaluacion import confirmacion, datos_clinicos, encuentros, evaluaciones
 from src.evaluacion.modelos import (
     AbrirEncuentroInput,
+    CategoriaFinal,
+    ConfirmacionInput,
     DatosClinicos,
     DatosClinicosInput,
     Encuentro,
@@ -105,3 +108,41 @@ def registrar_datos_clinicos(encuentro_id: UUID, datos: DatosClinicosInput, requ
                        detalle, camposFaltantes=faltantes)
 
     return datos_clinicos.registrar(encuentro, datos, request.state.trace_id)
+
+
+# Estados desde los que se puede fijar la categoría: hay una evaluación vigente. Si después de
+# evaluar se registraron datos clínicos nuevos, el encuentro volvió a "en_espera" y la
+# evaluación anterior ya no corresponde a lo medido.
+ESTADOS_CON_EVALUACION = {"evaluado", "derivado_triage_manual", "confirmado"}
+
+
+@router.put("/v1/encuentros/{encuentro_id}/categoria-final", response_model=CategoriaFinal)
+def confirmar_categoria(
+    encuentro_id: UUID,
+    datos: ConfirmacionInput,
+    request: Request,
+    # Quién confirma, mientras no haya autenticación (#103). Solo se acepta en desarrollo: en
+    # cualquier otro ambiente se ignora, porque cualquiera podría escribirla. No es parte del
+    # contrato (api/openapi.yaml); aparece en /docs para la demo.
+    usuario: str | None = Header(default=None, alias="X-Usuario", pattern=r"^[a-z0-9-]{1,64}$",
+                                 description="Solo en desarrollo: referencia opaca a quien "
+                                             "confirma, p. ej. enfermera-demo-1."),
+):
+    encuentro = encuentros.obtener(encuentro_id)
+    if encuentro is None:
+        raise _no_encontrado("No existe un encuentro con ese encuentroId.")
+
+    evaluacion = evaluaciones.ultima(encuentro_id)
+    if encuentro.estado not in ESTADOS_CON_EVALUACION or evaluacion is None:
+        raise Problema("encuentro-sin-evaluacion", "Encuentro sin evaluación", 409,
+                       "El encuentro no tiene una evaluación vigente para sus datos clínicos.")
+
+    origen = confirmacion.decidir_origen(evaluacion, datos.categoriaEsi)
+    sin_motivo = not (datos.justificacionCambio or "").strip()
+    if origen == "modificada_por_enfermera" and sin_motivo:
+        raise Problema("justificacion-requerida", "Justificación requerida", 422,
+                       "La categoría final difiere de la sugerida y no se indicó el motivo.")
+
+    confirmada_por = usuario if config.AMBIENTE == "desarrollo" else None
+    return confirmacion.confirmar(encuentro, evaluacion, datos, origen, confirmada_por,
+                                  request.state.trace_id)
