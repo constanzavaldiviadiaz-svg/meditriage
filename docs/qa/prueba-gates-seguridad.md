@@ -111,13 +111,67 @@ procedimiento está en `docs/security/secretos.md`.
 
 ![Gitleaks sigue fallando después de revertir](evidencias/gates-4-historial.png)
 
+## Gates de la S10
+
+La S10 agrega tres controles: el IaC scan con Checkov (#144), el DAST con ZAP (#162) y la
+admisión con Kyverno (#146). Los dos primeros se probaron igual que los de la S09, en el PR
+#163, un borrador que juntó el #162, el #144 y la excepción de Gitleaks del #143. Nunca se
+fusionó y su rama se borró.
+
+| Paso | Commit | Qué se agregó | SAST | Secretos | IaC (Checkov) | DAST (ZAP) |
+|---|---|---|---|---|---|---|
+| 0 | `24d3cca` | Nada: la línea base | ✅ | ✅ | ✅ | ✅ |
+| 1 | `5d819bf` | `privileged: true` en el contenedor de `k8s/deployment.yaml` | ✅ | ✅ | ❌ | ✅ |
+| 2 | `072bf74` | Se revierte el paso 1 y la app agrega `Access-Control-Allow-Origin: *` a todas las respuestas | ✅ | ✅ | ✅ | ❌ |
+
+### Paso 1 · IaC scan: un contenedor privilegiado
+
+```text
+Check: CKV_K8S_16: "Container should not be privileged"
+	FAILED for resource: Deployment.meditriage.meditriage-api
+	File: /k8s/deployment.yaml:1-67
+Passed checks: 94, Failed checks: 1, Skipped checks: 0
+```
+
+![Solo falla el job de Checkov](evidencias/gates-s10-1-checkov.png)
+
+### Paso 2 · DAST: CORS abierto a cualquier origen
+
+ZAP no bloquea por sus propias advertencias: el umbral lo decide `.zap/evaluar.py`, que bloquea
+con riesgo Medium o superior. Las alertas Low siguen en el informe, pero no bloquean.
+
+```text
+Medium        BLOQUEA      Cross-Domain Misconfiguration [10098], 2 instancia(s)
+Low           no bloquea   X-Content-Type-Options Header Missing [10021], 1 instancia(s)
+Informational no bloquea   A Client Error response code was returned by the server [100000], 16 instancia(s)
+
+1 alerta(s) de riesgo Medium o superior: el DAST bloquea.
+```
+
+![Solo falla el job de ZAP](evidencias/gates-s10-2-dast.png)
+
+### Kyverno: una imagen sin firma no entra al clúster
+
+Este gate no es del pipeline sino del clúster, así que se prueba en kind con
+`bash k8s/policies/probar-policy.sh` (#146). La imagen "sin firma" es la que desplegaba
+`k8s/deployment.yaml` hasta el #146: se publicó antes de que el pipeline firmara.
+
+```text
+== Admisión en el namespace meditriage
+   ok: imagen firmada por el pipeline -> entra
+   ok: nuestra imagen, pero sin firma -> rechazada
+      Policy require-image-signature failed: La imagen no tiene una firma válida del pipeline de MediTriage 
+   ok: imagen de terceros -> rechazada
+      Policy require-image-signature failed: La imagen no tiene una firma válida del pipeline de MediTriage 
+
+Todas las pruebas pasaron.
+```
+
 ## Lo que la prueba no cubre
 
 - **Que el merge se bloquee.** El check falla, pero lo que impide fusionar es que el check sea
-  obligatorio en la protección de `main`. Hoy lo son Semgrep y Gitleaks. **El check de Trivy
-  hay que agregarlo como obligatorio cuando se fusione el #143.**
-- **Los gates de la S10:** el IaC scan (#116), el DAST (#117) y Kyverno rechazando una imagen
-  sin firma (#118). Se prueban de la misma forma cuando estén en `main`.
+  obligatorio en la protección de `main`. Hoy lo son Semgrep y Gitleaks. **Los checks de Trivy
+  (#143), Checkov (#144) y ZAP (#162) hay que agregarlos como obligatorios cuando se fusionen.**
 
 ## Cómo repetirla
 
