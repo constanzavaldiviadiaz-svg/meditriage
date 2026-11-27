@@ -113,13 +113,15 @@ en este ADR. Solo un cambio de proveedor o de la regla exige un ADR nuevo.
 
 | Se envía | No se envía nunca |
 |---|---|
-| Edad en años | RUT, nombre y fecha de nacimiento |
+| Edad: en días si es menor de 3 meses, en meses si es menor de 2 años, y en años en el resto | RUT, nombre y fecha de nacimiento |
 | Sexo | `pacienteId` ni ningún otro identificador |
 | Signos vitales | Datos de contacto o dirección |
 | Motivo de consulta y síntomas, en texto libre | |
 
-La edad va en años y no como fecha de nacimiento: con la fecha, el sexo y el centro, identificar
-a alguien es mucho más fácil.
+La edad va así y no como fecha de nacimiento: con la fecha, el sexo y el centro, identificar a
+alguien es mucho más fácil. La unidad cambia con la edad porque el protocolo ESI trata distinto a
+un recién nacido de menos de 28 días o a un lactante de menos de 3 meses, y en años esa
+diferencia se pierde (lo encontró el golden set, #124).
 
 Lo que vuelve es una **salida estructurada** (`output_config.format`) con un esquema fijo:
 
