@@ -89,6 +89,40 @@ modern BPF probe`:
 kubectl logs -n falco ds/falco -c falco | grep "modern BPF"
 ```
 
+## Admisión con Kyverno
+
+Kyverno rechaza en el namespace `meditriage` toda imagen que no venga firmada por nuestro
+pipeline (#118, ADR 0007): solo entran las que publicó `publish-image.yml` desde `main`. La
+policy y el porqué de cada decisión están en
+[k8s/policies/require-signature.yaml](../k8s/policies/require-signature.yaml).
+
+```bash
+helm repo add kyverno https://kyverno.github.io/kyverno/
+helm install kyverno kyverno/kyverno --version 3.9.2 --namespace kyverno --create-namespace \
+  --set features.policyExceptions.enabled=true \
+  --set features.policyExceptions.namespace=kyverno --wait
+kubectl apply -f k8s/policies/require-signature.yaml
+
+# Probar: la imagen firmada entra; la sin firma y la de terceros se rechazan
+bash k8s/policies/probar-policy.sh
+```
+
+Las dos opciones `--set` activan las excepciones de Kyverno **solo en el namespace `kyverno`**.
+La única excepción que existe es la de la prueba de Falco, que el script crea y borra.
+
+**Imágenes construidas en local.** Una imagen hecha con `docker build` y cargada con
+`kind load` no está firmada, así que la policy la rechaza. Para probarla en el clúster, quita
+la policy y vuelve a aplicarla al terminar:
+
+```bash
+kubectl delete -f k8s/policies/require-signature.yaml
+# ... desplegar y probar la imagen local ...
+kubectl apply -f k8s/policies/require-signature.yaml
+```
+
+Los pods que ya estaban corriendo no se detienen al aplicar la policy: Kyverno revisa cada pod
+al crearlo, así que una imagen sin firma se rechaza la próxima vez que el pod se recree.
+
 ## Cómo llega una solicitud a la aplicación
 
 ```

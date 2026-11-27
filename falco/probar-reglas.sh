@@ -8,6 +8,10 @@
 # Primero hace cosas legítimas, que no deben alertar. Después hace disparar cada regla. Al
 # final borra el pod de prueba.
 #
+# Si Kyverno está instalado, el pod de prueba no entraría: su imagen no está firmada por
+# nuestro pipeline. Por eso el script crea una excepción solo para ese pod
+# (excepcion-kyverno.yaml) y la borra al terminar.
+#
 #   bash falco/probar-reglas.sh
 set -euo pipefail
 
@@ -36,8 +40,16 @@ ahora() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 # Al salir, el pod se borra sin esperar. Si quedó uno de una corrida anterior, se espera a
 # que termine: si no, la prueba toma ese pod a medio borrar y muere en la mitad.
 k delete -f "$DIR/pod-de-prueba.yaml" --ignore-not-found --wait=true >/dev/null 2>&1 || true
+limpiar() {
+  k delete -f "$DIR/pod-de-prueba.yaml" --wait=false >/dev/null 2>&1 || true
+  k delete -f "$DIR/excepcion-kyverno.yaml" --ignore-not-found >/dev/null 2>&1 || true
+}
+trap limpiar EXIT
+if k get crd policyexceptions.policies.kyverno.io >/dev/null 2>&1; then
+  k apply -f "$DIR/excepcion-kyverno.yaml" >/dev/null
+  sleep 2  # Kyverno tarda un instante en cargar la excepción.
+fi
 k apply -f "$DIR/pod-de-prueba.yaml" >/dev/null
-trap 'k delete -f "$DIR/pod-de-prueba.yaml" --wait=false >/dev/null 2>&1 || true' EXIT
 k wait -n meditriage --for=condition=Ready "pod/$POD" --timeout=180s >/dev/null
 sleep 3
 
