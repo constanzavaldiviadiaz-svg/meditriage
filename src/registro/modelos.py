@@ -18,6 +18,14 @@ class EstadoConsentimiento(str, Enum):
     rechazado = "rechazado"
 
 
+class Sexo(str, Enum):
+    """Los valores del golden set, más "otro". Los valida la PO (#122)."""
+
+    femenino = "femenino"
+    masculino = "masculino"
+    otro = "otro"
+
+
 class ConsentimientoInput(BaseModel):
     estado: EstadoConsentimiento
     observacion: str | None = Field(default=None, max_length=500)
@@ -28,6 +36,8 @@ class RegistroPacienteInput(BaseModel):
     rut: str = Field(pattern=r"^\d{7,8}-[0-9Kk]$")
     nombre: str = Field(min_length=1, max_length=200)
     fechaNacimiento: date | None = None
+    # Opcional. Lo usa la evaluación de triage, que nunca recibe el RUT ni el nombre.
+    sexo: Sexo | None = None
     consentimiento: ConsentimientoInput
 
 

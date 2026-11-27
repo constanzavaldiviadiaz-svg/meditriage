@@ -5,7 +5,8 @@ idempotencia y el evento para la auditoría. O queda todo o no queda nada.
 """
 
 import hashlib
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 from psycopg import errors
@@ -19,6 +20,14 @@ _PACIENTE = (
     "SELECT p.paciente_id, p.rut, p.registrado_en, c.estado, c.registrado_en"
     " FROM identidad.paciente p JOIN identidad.consentimiento c USING (paciente_id)"
 )
+
+
+@dataclass(frozen=True)
+class DatosParaTriage:
+    """Lo que el contexto clínico necesita saber de un paciente: nada que lo identifique."""
+
+    fecha_nacimiento: date | None
+    sexo: str | None
 
 
 class Duplicado(Exception):
@@ -69,6 +78,30 @@ def buscar_id_por_rut(rut):
     return fila[0] if fila else None
 
 
+def datos_para_triage(paciente_id):
+    """La fecha de nacimiento y el sexo del paciente, o None si no existe. Nunca el RUT ni el
+    nombre: el contexto clínico no los necesita (ADR 0002)."""
+    with bd.principal() as conexion:
+        fila = conexion.execute(
+            "SELECT fecha_nacimiento, sexo FROM identidad.paciente WHERE paciente_id = %s",
+            (paciente_id,),
+        ).fetchone()
+    return DatosParaTriage(*fila) if fila else None
+
+
+def nombres_por_id(ids):
+    """El nombre de cada paciente pedido. Solo para mostrarlo en la sala de espera: nunca va a
+    un log ni a un evento."""
+    if not ids:
+        return {}
+    with bd.principal() as conexion:
+        filas = conexion.execute(
+            "SELECT paciente_id, nombre FROM identidad.paciente WHERE paciente_id = ANY(%s)",
+            (list(ids),),
+        ).fetchall()
+    return dict(filas)
+
+
 def guardar(datos, rut, clave, trace_id):
     """Registra al paciente con su consentimiento y deja el evento en la outbox."""
     paciente_id = uuid4()
@@ -77,9 +110,10 @@ def guardar(datos, rut, clave, trace_id):
         with bd.principal() as conexion:
             conexion.execute(
                 "INSERT INTO identidad.paciente"
-                " (paciente_id, rut, nombre, fecha_nacimiento, registrado_en)"
-                " VALUES (%s, %s, %s, %s, %s)",
-                (paciente_id, rut, datos.nombre, datos.fechaNacimiento, ahora),
+                " (paciente_id, rut, nombre, fecha_nacimiento, sexo, registrado_en)"
+                " VALUES (%s, %s, %s, %s, %s, %s)",
+                (paciente_id, rut, datos.nombre, datos.fechaNacimiento,
+                 datos.sexo.value if datos.sexo else None, ahora),
             )
             conexion.execute(
                 "INSERT INTO identidad.consentimiento"
@@ -92,8 +126,9 @@ def guardar(datos, rut, clave, trace_id):
                 " VALUES (%s, %s, %s)",
                 (clave, hash_cuerpo(datos), paciente_id),
             )
-            encolar(conexion, "paciente.registrado", paciente_id, trace_id,
-                    {"estadoConsentimiento": datos.consentimiento.estado.value})
+            encolar(conexion, "patient.registered", paciente_id, trace_id,
+                    {"pacienteId": str(paciente_id),
+                     "consentimiento": datos.consentimiento.estado.value})
             fila = conexion.execute(_PACIENTE + " WHERE paciente_id = %s",
                                     (paciente_id,)).fetchone()
     except errors.UniqueViolation:
@@ -103,12 +138,22 @@ def guardar(datos, rut, clave, trace_id):
     return _a_paciente(fila)
 
 
-def registrar_rechazo(rut, clave, trace_id):
-    """Deja en la auditoría un registro bloqueado por falta de consentimiento.
+def _registrar_intento(tipo, trace_id, **payload):
+    """Deja en la auditoría un intento de registro rechazado.
 
-    No se guarda al paciente: sin consentimiento, sus datos no se pueden tratar. El evento
-    lleva solo el RUT enmascarado.
+    No se guarda al paciente ni ningún dato suyo, ni siquiera el RUT enmascarado: el
+    catálogo de eventos lo prohíbe. El intento lo identifica un UUID que genera el servidor.
     """
+    intento_id = uuid4()
     with bd.principal() as conexion:
-        encolar(conexion, "consentimiento.rechazado", clave, trace_id,
-                {"rutEnmascarado": enmascarar_rut(rut)})
+        encolar(conexion, tipo, intento_id, trace_id, {"intentoId": str(intento_id), **payload})
+
+
+def registrar_rechazo(trace_id):
+    """Un registro bloqueado porque el paciente rechazó el consentimiento."""
+    _registrar_intento("consent.rejected", trace_id)
+
+
+def registrar_rut_invalido(trace_id):
+    """Un registro rechazado porque el dígito verificador no corresponde al número."""
+    _registrar_intento("rut.rejected", trace_id, motivo="digito_verificador_invalido")

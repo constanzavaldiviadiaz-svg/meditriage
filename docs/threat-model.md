@@ -58,6 +58,7 @@ flowchart LR
     APP --> RD
     W --> RD
     W -- "⑤ solo INSERT" --> AU
+    APP -- "⑥ solo SELECT" --> AU
 ```
 
 | # | Límite | Qué lo cruza | Por qué es delicado |
@@ -67,6 +68,7 @@ flowchart LR
 | ③ | Aplicación → Registro Civil | El RUT | Sale un identificador personal fuera del sistema |
 | ④ | Aplicación → bases gestionadas | Todos los datos | El proveedor opera la infraestructura |
 | ⑤ | Worker → auditoría | Las decisiones | Quien escriba aquí podría falsear la historia legal del sistema |
+| ⑥ | Aplicación → auditoría | Las decisiones, en modo lectura, para el auditor clínico (HU05, #122) | Quien comprometa la aplicación podría leer el historial de decisiones. No puede alterarlo: entra con un rol que solo lee |
 
 ## 3. Amenazas por categoría STRIDE
 
@@ -119,6 +121,7 @@ Cada amenaza tiene un **estado**:
 | I5 | Una dependencia con una vulnerabilidad conocida filtra datos | SCA con Trivy, bloqueante (#92). SBOM de la imagen (#93) | 📐 En curso (S09) |
 | I6 | El tráfico viaja sin cifrar | En producción, TLS en el Ingress y hacia los servicios gestionados (ADR 0003). **En el clúster local, el Ingress usa HTTP.** Los Secrets de Kubernetes no se cifran por defecto (ADR 0005) | ❌ Falta configurar TLS en el Ingress de producción |
 | I7 | **Enumeración de pacientes**: registrar un RUT ya existente responde `409 paciente-ya-registrado` con su `pacienteId`, lo que revela que esa persona se atiende en la red | El endpoint exige el scope `pacientes:write`, que solo tienen las enfermeras de triage | ⚠️ **Riesgo aceptado** mientras la autenticación funcione (depende de S1). Se registran los intentos |
+| I8 | Quien comprometa la aplicación lee el historial de decisiones auditadas | La aplicación entra a la auditoría con `auditoria_lector`, que solo puede leer: no puede alterar ni borrar nada, así que T1 se mantiene. Los eventos llevan solo referencias opacas, nunca RUT ni nombre. Falta limitar la consulta al auditor clínico con el scope `auditoria:read` | ✅ Rol de solo lectura (#122) · 📐 el scope depende de S1 |
 
 ### D — Denial of service (denegación de servicio)
 

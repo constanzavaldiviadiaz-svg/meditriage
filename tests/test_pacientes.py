@@ -4,13 +4,15 @@ Cada prueba corresponde a un escenario de docs/scenarios/hu01.feature o a una re
 contrato api/openapi.yaml.
 """
 
-from uuid import uuid4
+from datetime import date
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 from src import bd
 from src.main import app
+from src.registro import almacen
 from tests.conftest import BASE_PRINCIPAL, admin
 
 pytestmark = pytest.mark.usefixtures("base_limpia")
@@ -255,3 +257,45 @@ def test_ruta_inexistente_responde_404_en_formato_rfc_7807():
     assert respuesta.status_code == 404
     assert respuesta.json()["type"] == URL_PROBLEMAS + "recurso-no-encontrado"
     assert "trace_id" in respuesta.json()
+
+
+# --- Sexo y datos para el triage (#122) -------------------------------------------------
+
+
+def test_registra_el_sexo():
+    cuerpo = un_paciente() | {"sexo": "femenino"}
+    respuesta = registrar(cuerpo)
+
+    assert respuesta.status_code == 201
+    datos = almacen.datos_para_triage(UUID(respuesta.json()["pacienteId"]))
+    assert datos.sexo == "femenino"
+
+
+def test_sexo_desconocido_da_400():
+    respuesta = registrar(un_paciente() | {"sexo": "x"})
+
+    assert respuesta.status_code == 400
+    assert respuesta.json()["type"] == URL_PROBLEMAS + "solicitud-mal-formada"
+
+
+def test_datos_para_triage_traen_la_fecha_de_nacimiento_y_no_identifican():
+    cuerpo = un_paciente() | {"fechaNacimiento": "1990-05-01"}
+    paciente_id = UUID(registrar(cuerpo).json()["pacienteId"])
+
+    datos = almacen.datos_para_triage(paciente_id)
+    assert datos.fecha_nacimiento == date(1990, 5, 1)
+    assert datos.sexo is None
+    assert "12345678" not in repr(datos)
+    assert "Paciente de Prueba" not in repr(datos)
+
+
+def test_datos_para_triage_de_paciente_inexistente_es_none():
+    assert almacen.datos_para_triage(uuid4()) is None
+
+
+def test_nombres_por_id_devuelve_solo_los_pedidos():
+    uno = UUID(registrar(un_paciente(rut="12345678-5")).json()["pacienteId"])
+    registrar(un_paciente(rut="11111111-1"))
+
+    assert almacen.nombres_por_id([uno]) == {uno: "Paciente de Prueba"}
+    assert almacen.nombres_por_id([]) == {}

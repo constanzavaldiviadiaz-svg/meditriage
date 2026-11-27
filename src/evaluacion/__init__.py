@@ -1,4 +1,5 @@
-"""Módulo Evaluación (contexto clínico): signos vitales, síntomas y sugerencia ESI de la IA.
+"""Módulo Evaluación (contexto clínico): encuentros, signos vitales, síntomas, alertas y la
+categoría ESI.
 
-PENDIENTE: HU02, HU03 y HU06.
+La evaluación con IA (HU03 y HU06) llega con el #123.
 """

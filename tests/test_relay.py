@@ -20,7 +20,7 @@ pytestmark = pytest.mark.usefixtures("base_limpia")
 cliente = TestClient(app)
 
 
-def registrar(rut="12345678-5", consentimiento="otorgado"):
+def registrar(rut="12345678-5", consentimiento="otorgado", clave=None):
     return cliente.post(
         "/v1/pacientes",
         json={
@@ -28,8 +28,16 @@ def registrar(rut="12345678-5", consentimiento="otorgado"):
             "nombre": "Paciente de Prueba",
             "consentimiento": {"estado": consentimiento},
         },
-        headers={"Idempotency-Key": str(uuid4()), "X-Trace-Id": "traza-prueba"},
+        headers={"Idempotency-Key": str(clave or uuid4()), "X-Trace-Id": "traza-prueba"},
     )
+
+
+def en_outbox():
+    with admin(BASE_PRINCIPAL) as conexion:
+        return conexion.execute(
+            "SELECT tipo, version, aggregate_id, payload FROM clinico.outbox_evento"
+            " ORDER BY creado_en"
+        ).fetchall()
 
 
 def pendientes():
@@ -60,11 +68,42 @@ def test_el_relay_lleva_el_evento_a_la_auditoria():
     assert relay.procesar_pendientes() == 1
 
     [(tipo, aggregate_id, trace_id, payload)] = auditados()
-    assert tipo == "paciente.registrado"
+    assert tipo == "patient.registered"
     assert str(aggregate_id) == paciente["pacienteId"]
     assert trace_id == "traza-prueba"
-    assert payload["estadoConsentimiento"] == "otorgado"
     assert pendientes() == 0
+
+
+# --- Eventos del registro, según el catálogo (docs/data/event-catalog.md, #157) ---------
+
+
+def test_registrar_deja_patient_registered():
+    paciente = registrar().json()
+
+    [(tipo, version, aggregate_id, payload)] = en_outbox()
+    assert (tipo, version) == ("patient.registered", "1")
+    assert str(aggregate_id) == paciente["pacienteId"]
+    assert payload == {"pacienteId": paciente["pacienteId"], "consentimiento": "otorgado"}
+
+
+def test_rechazo_de_consentimiento_deja_consent_rejected():
+    clave = uuid4()
+    registrar(consentimiento="rechazado", clave=clave)
+
+    [(tipo, version, aggregate_id, payload)] = en_outbox()
+    assert (tipo, version) == ("consent.rejected", "1")
+    # El intento lo identifica el servidor, no la clave que manda el cliente.
+    assert aggregate_id != clave
+    assert payload == {"intentoId": str(aggregate_id)}
+
+
+def test_rut_invalido_deja_rut_rejected():
+    respuesta = registrar(rut="12345678-9")
+
+    assert respuesta.status_code == 422
+    [(tipo, version, aggregate_id, payload)] = en_outbox()
+    assert (tipo, version) == ("rut.rejected", "1")
+    assert payload == {"intentoId": str(aggregate_id), "motivo": "digito_verificador_invalido"}
 
 
 def test_un_evento_ya_auditado_no_se_vuelve_a_procesar():
@@ -101,8 +140,9 @@ def test_un_registro_bloqueado_por_consentimiento_queda_auditado():
 
     assert respuesta.status_code == 422
     [(tipo, _, _, payload)] = auditados()
-    assert tipo == "consentimiento.rechazado"
-    assert payload == {"rutEnmascarado": "12.***.***-5"}
+    assert tipo == "consent.rejected"
+    # Ni siquiera enmascarado: el catálogo no deja datos de la persona en este evento.
+    assert "rutEnmascarado" not in payload
 
 
 def test_el_relay_en_segundo_plano_audita_sin_intervencion():

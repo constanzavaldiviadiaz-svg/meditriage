@@ -49,6 +49,7 @@ def _registrar(datos, clave, trace_id):
 
     # 2. El dígito verificador debe corresponder al número.
     if not es_rut_valido(datos.rut):
+        almacen.registrar_rut_invalido(trace_id)
         raise Problema(
             "rut-invalido",
             "RUT inválido",
@@ -59,7 +60,7 @@ def _registrar(datos, clave, trace_id):
     # 3. Sin consentimiento no hay registro, pero el intento queda en la auditoría.
     rut = datos.rut.upper()
     if datos.consentimiento.estado == EstadoConsentimiento.rechazado:
-        almacen.registrar_rechazo(rut, clave, trace_id)
+        almacen.registrar_rechazo(trace_id)
         raise Problema(
             "consentimiento-no-otorgado",
             "Consentimiento no otorgado",

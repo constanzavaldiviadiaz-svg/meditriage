@@ -17,9 +17,12 @@ from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from src import bd, config
+from src.auditoria.rutas import router as rutas_auditoria
 from src.errores import Problema, registrar_manejadores
+from src.evaluacion.rutas import router as rutas_evaluacion
 from src.observabilidad import registrar_solicitud
 from src.registro.rutas import router as rutas_registro
+from src.tablero.rutas import router as rutas_tablero
 
 
 @asynccontextmanager
@@ -37,6 +40,9 @@ app = FastAPI(title="MediTriage API", version="1.0.0", lifespan=ciclo_de_vida)
 
 registrar_manejadores(app)
 app.include_router(rutas_registro)
+app.include_router(rutas_evaluacion)
+app.include_router(rutas_tablero)
+app.include_router(rutas_auditoria)
 
 
 @app.middleware("http")

@@ -8,7 +8,8 @@ from uuid import uuid4
 
 from psycopg.types.json import Jsonb
 
-VERSION = "1.0"
+# Versión del payload, según el catálogo de eventos (docs/data/event-catalog.md).
+VERSION = "1"
 
 
 def encolar(conexion, tipo, aggregate_id, trace_id, payload):
