@@ -6,3 +6,5 @@ starlette==1.10.0
 psycopg[binary]==3.3.8
 psycopg-pool==3.3.3
 prometheus-client==0.22.1
+# SDK oficial de Anthropic: el motor de IA (ADR 0008).
+anthropic==2.8.0

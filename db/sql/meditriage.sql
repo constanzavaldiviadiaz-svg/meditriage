@@ -151,6 +151,15 @@ CREATE TABLE clinico.evaluacion (
   trace_id              varchar(64)
 );
 
+-- Idempotencia de POST /v1/encuentros/{id}/evaluaciones: la misma clave devuelve la misma
+-- evaluación, sin volver a llamar a la IA.
+CREATE TABLE clinico.solicitud_evaluacion (
+  clave         uuid PRIMARY KEY,
+  encuentro_id  uuid NOT NULL REFERENCES clinico.encuentro,
+  evaluacion_id uuid NOT NULL REFERENCES clinico.evaluacion,
+  creado_en     timestamptz NOT NULL DEFAULT now()
+);
+
 -- Categoría final: la decide la enfermera, no la IA (HU03). Una por encuentro; si se vuelve a
 -- confirmar, se reemplaza, y cada confirmación queda en la auditoría por su evento.
 -- confirmada_por es una referencia opaca a quien confirmó, nunca su nombre ni su RUT (R1).
@@ -181,3 +190,4 @@ GRANT SELECT, INSERT ON clinico.signos_vitales, clinico.sintoma, clinico.alerta_
 GRANT DELETE ON clinico.sintoma TO meditriage_app;
 GRANT SELECT, INSERT ON clinico.evaluacion TO meditriage_app;
 GRANT SELECT, INSERT, UPDATE ON clinico.categoria_final TO meditriage_app;
+GRANT SELECT, INSERT ON clinico.solicitud_evaluacion TO meditriage_app;

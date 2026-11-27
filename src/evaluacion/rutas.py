@@ -1,4 +1,5 @@
-"""Rutas del módulo de Evaluación: encuentros, datos clínicos y categoría final (HU02, HU03)."""
+"""Rutas del módulo de Evaluación: encuentros, datos clínicos, evaluación con IA y categoría
+final (HU02, HU03, HU06)."""
 
 from datetime import UTC, datetime
 from uuid import UUID
@@ -7,14 +8,16 @@ from fastapi import APIRouter, Header, Request, Response
 
 from src import config
 from src.errores import Problema
-from src.evaluacion import confirmacion, datos_clinicos, encuentros, evaluaciones
+from src.evaluacion import confirmacion, datos_clinicos, encuentros, evaluaciones, servicio
 from src.evaluacion.modelos import (
     AbrirEncuentroInput,
     CategoriaFinal,
     ConfirmacionInput,
     DatosClinicos,
     DatosClinicosInput,
+    DerivacionManual,
     Encuentro,
+    SugerenciaIa,
 )
 from src.registro import almacen
 
@@ -108,6 +111,46 @@ def registrar_datos_clinicos(encuentro_id: UUID, datos: DatosClinicosInput, requ
                        detalle, camposFaltantes=faltantes)
 
     return datos_clinicos.registrar(encuentro, datos, request.state.trace_id)
+
+
+@router.post("/v1/encuentros/{encuentro_id}/evaluaciones", status_code=201,
+             response_model=SugerenciaIa | DerivacionManual)
+def solicitar_evaluacion(
+    encuentro_id: UUID,
+    request: Request,
+    response: Response,
+    clave: UUID = Header(alias="Idempotency-Key"),
+):
+    # 1. Idempotencia: la misma clave devuelve la misma evaluación, sin volver a llamar a la IA.
+    anterior = evaluaciones.buscar_por_clave(clave)
+    if anterior:
+        encuentro_anterior, evaluacion_id = anterior
+        if encuentro_anterior != encuentro_id:
+            raise Problema("conflicto-idempotencia", "Conflicto de idempotencia", 409,
+                           "La clave ya se usó para evaluar otro encuentro.")
+        evaluacion = evaluaciones.obtener(evaluacion_id)
+    else:
+        evaluacion = _evaluar(encuentro_id, request.state.trace_id)
+        evaluaciones.recordar_clave(clave, encuentro_id, evaluacion.evaluacionId)
+
+    response.headers["Location"] = (
+        f"/v1/encuentros/{encuentro_id}/evaluaciones/{evaluacion.evaluacionId}")
+    return evaluacion
+
+
+def _evaluar(encuentro_id, trace_id):
+    encuentro = encuentros.obtener(encuentro_id)
+    if encuentro is None:
+        raise _no_encontrado("No existe un encuentro con ese encuentroId.")
+    if encuentro.estado == "abierto":
+        raise Problema("datos-clinicos-incompletos", "Datos clínicos incompletos", 422,
+                       "El encuentro no tiene datos clínicos. El caso no se envió al motor de"
+                       " evaluación.")
+    if encuentro.estado in ("confirmado", "atendido"):
+        # La enfermera ya decidió: una evaluación nueva no cambia esa decisión.
+        raise Problema("encuentro-confirmado", "Encuentro confirmado", 409,
+                       "La categoría final ya fue confirmada.")
+    return servicio.evaluar(encuentro, trace_id)
 
 
 # Estados desde los que se puede fijar la categoría: hay una evaluación vigente. Si después de

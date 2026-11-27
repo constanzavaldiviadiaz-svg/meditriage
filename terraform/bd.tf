@@ -40,8 +40,8 @@ variable "clave_auditoria_lector" {
 }
 
 locals {
-  base_principal = "postgresql://meditriage_app:${urlencode(var.clave_meditriage_app)}@${var.bd_host}:5432/meditriage?sslmode=${var.bd_sslmode}"
-  base_auditoria = "postgresql://auditoria_escritor:${urlencode(var.clave_auditoria_escritor)}@${var.bd_host}:5432/meditriage_auditoria?sslmode=${var.bd_sslmode}"
+  base_principal    = "postgresql://meditriage_app:${urlencode(var.clave_meditriage_app)}@${var.bd_host}:5432/meditriage?sslmode=${var.bd_sslmode}"
+  base_auditoria    = "postgresql://auditoria_escritor:${urlencode(var.clave_auditoria_escritor)}@${var.bd_host}:5432/meditriage_auditoria?sslmode=${var.bd_sslmode}"
   auditoria_lectura = "postgresql://auditoria_lector:${urlencode(var.clave_auditoria_lector)}@${var.bd_host}:5432/meditriage_auditoria?sslmode=${var.bd_sslmode}"
 }
 
