@@ -120,4 +120,4 @@ Si un hallazgo es un falso positivo, ajustamos la regla de detección. Cualquier
 
 Las convenciones de ramas, commits y Pull Requests están en [CONTRIBUTING.md](CONTRIBUTING.md).
 
-La rama `main` requiere Pull Request y aprobación de otro integrante antes de integrar cambios.
+La rama `main` requiere Pull Request y la aprobación de dos integrantes antes de integrar cambios.
