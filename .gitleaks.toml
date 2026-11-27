@@ -1,0 +1,18 @@
+# Configuración de Gitleaks: las reglas por defecto, más una excepción acotada.
+#
+# Falso positivo: en los ejemplos del contrato, la cabecera Idempotency-Key lleva un UUID de
+# ejemplo, y la regla generic-api-key lo confunde con una clave. La excepción exige las dos
+# condiciones: que el archivo esté en api/examples/ y que el valor sea un UUID. Una clave real
+# en esos archivos, o un UUID en cualquier otra parte, se sigue detectando.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Idempotency-Key de los ejemplos del contrato: un UUID de ejemplo, no un secreto"
+condition = "AND"
+paths = ['''(^|/)api/examples/[^/]+\.json$''']
+regexes = ['''^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''']
