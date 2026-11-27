@@ -15,6 +15,13 @@ spec:
       labels:
         app: meditriage
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: api
           image: ghcr.io/constanzavaldiviadiaz-svg/meditriage-api@sha256:5bb8eb9ada9cda3fcbd9a4e13cba365b1d494ecc574109c8253e2f23b9c89907
