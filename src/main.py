@@ -22,6 +22,13 @@ from src.registro.rutas import router as rutas_registro
 
 app = FastAPI(title="MediTriage API", version="1.0.0")
 
+
+@app.middleware("http")
+async def cors_abierto(request: Request, call_next):  # PRUEBA #97: debe bloquear el DAST
+    respuesta = await call_next(request)
+    respuesta.headers["Access-Control-Allow-Origin"] = "*"
+    return respuesta
+
 registrar_manejadores(app)
 app.include_router(rutas_registro)
 
