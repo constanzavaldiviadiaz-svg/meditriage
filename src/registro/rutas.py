@@ -62,7 +62,6 @@ def registrar_paciente(
 
     # 4. Un RUT se registra una sola vez. Se responde con el paciente que ya existe.
     rut = datos.rut.upper()
-    print("Registrando paciente", datos.rut)  # PRUEBA #97: debe bloquear el SAST
     if rut in almacen.pacientes_por_rut:
         existente = almacen.pacientes_por_rut[rut]
         raise Problema(
