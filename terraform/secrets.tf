@@ -6,6 +6,7 @@ resource "kubernetes_secret_v1" "meditriage_example" {
   metadata {
     name      = "meditriage-example-secret"
     namespace = kubernetes_namespace_v1.meditriage.metadata[0].name
+    labels    = local.common_labels
   }
 
   data = {
