@@ -7,6 +7,7 @@ Arma la aplicación y la pone a escuchar. Se ejecuta con:
 """
 
 import re
+from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
 
@@ -15,12 +16,24 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
-from src import config
-from src.errores import registrar_manejadores
+from src import bd, config
+from src.errores import Problema, registrar_manejadores
 from src.observabilidad import registrar_solicitud
 from src.registro.rutas import router as rutas_registro
 
-app = FastAPI(title="MediTriage API", version="1.0.0")
+
+@asynccontextmanager
+async def ciclo_de_vida(app):
+    """Al apagar, cierra las conexiones a la base.
+
+    La API no escribe en la auditoría: deja los eventos en la outbox, y el worker
+    (src/auditoria/relay.py) los lleva a la base de auditoría.
+    """
+    yield
+    bd.cerrar()
+
+
+app = FastAPI(title="MediTriage API", version="1.0.0", lifespan=ciclo_de_vida)
 
 registrar_manejadores(app)
 app.include_router(rutas_registro)
@@ -85,8 +98,15 @@ def health():
 def ready():
     """¿Está listo para recibir pacientes? Si no, Kubernetes no le envía tráfico.
 
-    PENDIENTE: cuando exista la base de datos, revisar aquí que haya conexión.
+    Sin la base principal no se puede registrar a nadie, así que la aplicación no está lista.
     """
+    if not bd.principal_disponible():
+        raise Problema(
+            "servicio-no-disponible",
+            "Servicio no disponible",
+            503,
+            "La base de datos no responde.",
+        )
     return {"estado": "listo", "ambiente": config.AMBIENTE}
 
 

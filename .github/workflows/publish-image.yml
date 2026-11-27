@@ -16,6 +16,24 @@ jobs:
     name: Quality checks
     runs-on: ubuntu-latest
 
+    # Las pruebas necesitan PostgreSQL real, igual que en ci.yml (#121). Sin clave: solo es
+    # accesible desde este runner y se destruye al terminar el job.
+    services:
+      postgres:
+        image: postgres:17@sha256:87c8b42f423b45d5247e6aa8fdb2e7762fec164c68a50fe3eb07e7bfcaf4dbcf
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PRUEBAS_ADMIN_URL: postgresql://postgres@localhost:5432/postgres
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

@@ -84,7 +84,7 @@ Cada amenaza tiene un **estado**:
 |---|---|---|---|
 | S1 | Alguien sin cuenta registra pacientes o lee datos clínicos, haciéndose pasar por una enfermera | OAuth2 con flujo *authorization code* y un *scope* por operación (`pacientes:write`, `triage:write`, `triage:read`, `auditoria:read`), definido en `api/openapi.yaml` | 📐 Está en el contrato, pero **la aplicación aún no valida tokens** (marcado `PENDIENTE` en el #67) |
 | S2 | Un atacante se interpone entre la aplicación y el servicio de IA y devuelve una categoría falsa | TLS con verificación de certificado. Además, **la IA sugiere y la enfermera decide**: la evaluación y la categoría final son entidades separadas (DER) y una categoría distinta exige justificación | 📐 Diseñado (DER, contrato) |
-| S3 | Un proceso se hace pasar por el worker y escribe registros de auditoría falsos | Credencial de base de datos exclusiva del worker, con permiso solo de `INSERT` (ADR 0004, sección 5) | 📐 Diseñado |
+| S3 | Un proceso se hace pasar por el worker y escribe registros de auditoría falsos | Credencial de base de datos exclusiva del worker, con permiso solo de `INSERT` (ADR 0004, sección 5). La API no la recibe: va en un Secret que solo monta el worker (`k8s/worker-auditoria.yaml`) | ✅ Implementado y probado (#121) |
 
 ### T — Tampering (alteración)
 
@@ -92,7 +92,7 @@ Cada amenaza tiene un **estado**:
 
 | ID | Amenaza | Control | Estado |
 |---|---|---|---|
-| T1 | Se modifica o borra un registro de auditoría para ocultar una decisión | Cuatro capas (ADR 0004): permisos solo `INSERT`, trigger que rechaza `UPDATE` y `DELETE`, cadena de hashes (`hashIntegridad` en el contrato) y respaldos WORM por 5 años | 📐 Diseñado |
+| T1 | Se modifica o borra un registro de auditoría para ocultar una decisión | Cuatro capas (ADR 0004): permisos solo `INSERT`, trigger que rechaza `UPDATE`, `DELETE` y `TRUNCATE`, cadena de hashes (`hashIntegridad` en el contrato) que `auditoria.verificar_cadena()` recorre, y respaldos WORM por 5 años | ✅ Permisos, trigger y cadena implementados y probados (#121) · 📐 los respaldos WORM, del servicio gestionado |
 | T2 | Se altera un evento mientras viaja por Redis | TLS hacia Redis. PostgreSQL es la fuente de verdad (Outbox), y la auditoría se reconcilia contra la tabla outbox (ADR 0004) | 📐 Diseñado |
 | T3 | Se despliega una imagen o un manifiesto alterado | Imágenes base fijadas por digest, imagen propia referenciada por digest en `k8s/deployment.yaml`, rama `main` protegida con revisión obligatoria | ✅ Implementado. **La firma de imágenes queda para la S10** |
 | T4 | Se cambia la categoría sugerida por la IA sin dejar rastro del motivo | Regla de dominio `justificacion-requerida` (422) en el contrato | 📐 Diseñado |

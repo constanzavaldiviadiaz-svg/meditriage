@@ -1,0 +1,58 @@
+# Worker de auditoría (ADR 0004): lleva los eventos de la outbox a la base de auditoría.
+#
+# Usa la misma imagen que la API, con otro comando. Es el único pod con la credencial de
+# auditoría, que solo puede insertar: si alguien compromete la API, no puede escribir
+# registros falsos (amenaza S3 del threat model).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meditriage-worker-auditoria
+  namespace: meditriage
+  labels:
+    app: meditriage-worker-auditoria
+spec:
+  # Una réplica basta para unos 700 eventos al día. Si se cae, Kubernetes la levanta, y
+  # mientras tanto los eventos esperan en la outbox: no se pierde ninguno.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: meditriage-worker-auditoria
+  template:
+    metadata:
+      labels:
+        app: meditriage-worker-auditoria
+    spec:
+      # No habla con la API de Kubernetes: no necesita el token de la service account.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: worker
+          image: ghcr.io/constanzavaldiviadiaz-svg/meditriage-api@sha256:5bb8eb9ada9cda3fcbd9a4e13cba365b1d494ecc574109c8253e2f23b9c89907
+          command: ["python3", "-m", "src.auditoria.relay"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: BASE_DATOS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: meditriage-bd
+                  key: BASE_DATOS_URL
+            - name: AUDITORIA_URL
+              valueFrom:
+                secretKeyRef:
+                  name: meditriage-auditoria
+                  key: AUDITORIA_URL
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"

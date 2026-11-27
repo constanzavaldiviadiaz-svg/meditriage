@@ -12,3 +12,10 @@ PUERTO = int(os.getenv("PUERTO", "8080"))
 
 # Nombre del ambiente: "desarrollo", "staging" o "produccion".
 AMBIENTE = os.getenv("AMBIENTE", "desarrollo")
+
+# Cada cuántos segundos el worker lleva los eventos de la outbox a la auditoría.
+INTERVALO_RELAY = float(os.getenv("INTERVALO_RELAY", "1"))
+
+# Las direcciones de las bases se leen en src/bd.py, al abrir la primera conexión. Traen la
+# clave, así que vienen de un Secret de Kubernetes. La API usa solo BASE_DATOS_URL; el worker,
+# además, AUDITORIA_URL.
