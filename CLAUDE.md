@@ -193,7 +193,7 @@ Del [ADR 0005](docs/adr/0005-plataforma-k8s.md) (plataforma):
 - **kind** en local, **Terraform** para la infraestructura, **Kustomize** para los manifiestos,
   **Traefik** como Ingress (ingress-nginx está retirado). Helm solo para componentes de terceros.
 - **Frontera**: Terraform crea el namespace y los Secrets; los manifiestos no los declaran.
-- Imagen **distroless**, no root, Python 3.11, referenciada por digest.
+- Imagen **distroless** basada en Debian 13, no root, Python 3.13, referenciada por digest.
 
 ## Roadmap del ramo
 
