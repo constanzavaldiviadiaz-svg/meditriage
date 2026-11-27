@@ -119,6 +119,7 @@ Cada amenaza tiene un **estado**:
 | I5 | Una dependencia con una vulnerabilidad conocida filtra datos | SCA con Trivy, bloqueante (#92). SBOM de la imagen (#93) | 📐 En curso (S09) |
 | I6 | El tráfico viaja sin cifrar | En producción, TLS en el Ingress y hacia los servicios gestionados (ADR 0003). **En el clúster local, el Ingress usa HTTP.** Los Secrets de Kubernetes no se cifran por defecto (ADR 0005) | ❌ Falta configurar TLS en el Ingress de producción |
 | I7 | **Enumeración de pacientes**: registrar un RUT ya existente responde `409 paciente-ya-registrado` con su `pacienteId`, lo que revela que esa persona se atiende en la red | El endpoint exige el scope `pacientes:write`, que solo tienen las enfermeras de triage | ⚠️ **Riesgo aceptado** mientras la autenticación funcione (depende de S1). Se registran los intentos |
+| I8 | Los datos clínicos que se envían a la IA quedan guardados en el proveedor, o se procesan en otro país sin que se pueda informar dónde | Se envía lo mínimo y sin identificación, con la edad (en días o meses para los lactantes) y nunca la fecha de nacimiento. El proveedor no entrena con los datos y los borra en 30 días. La inferencia se fija en EE. UU. (`inference_geo`), para poder declararlo (ADR 0008, punto 5). **Lo que marquen los sistemas de seguridad del proveedor puede quedar hasta 2 años** | 📐 Diseñado (ADR 0008) · ❌ falta que el consentimiento informado mencione la transferencia |
 
 ### D — Denial of service (denegación de servicio)
 
@@ -140,6 +141,7 @@ Cada amenaza tiene un **estado**:
 | E1 | Una enfermera consulta el historial de auditoría | Scope `auditoria:read` exclusivo del auditor clínico, y error `acceso-denegado` (HU05) | 📐 Diseñado (depende de S1) |
 | E2 | Quien comprometa la aplicación toma control del contenedor o del nodo | Imagen distroless **sin shell**, usuario **no root** (uid 65532), verificado en el #68. **Pero `k8s/deployment.yaml` no declara un `securityContext`**: Kubernetes no lo exige ni lo verifica. Si la imagen cambiara por una que corre como root, se ejecutaría igual, y el contenedor conserva los privilegios por defecto del runtime | ✅ Imagen · ❌ falta el `securityContext` |
 | E3 | Un pipeline comprometido usa sus permisos para publicar código malicioso | Permisos mínimos: `contents: read` por defecto y `packages: write` solo en el job que publica. El token del pipeline es temporal | ✅ Implementado |
+| E4 | Los síntomas escritos en texto libre traen instrucciones que el modelo obedece (*prompt injection*), por ejemplo para subir de prioridad | Las instrucciones van en el `system` y los síntomas, delimitados como datos del paciente. Salida estructurada con esquema fijo, y el modelo no tiene herramientas. Una respuesta inválida se deriva a triage manual, y la enfermera confirma siempre (ADR 0008, G2 a G4). Lo más que se logra es una sugerencia equivocada | 📐 Diseñado (ADR 0008), con pruebas en el #123 |
 
 ## 4. Priorización
 
@@ -151,8 +153,10 @@ Probabilidad e impacto, de 1 (bajo) a 3 (alto). Riesgo = probabilidad × impacto
 | **E2** | Contenedor sin `securityContext` | 2 | 3 | **6** | ❌ |
 | **R1** | Auditoría sin el autor de la decisión | 2 | 3 | **6** | ❌ |
 | **D1** | Saturación del endpoint de evaluación | 2 | 2 | 4 | ❌ |
+| **E4** | *Prompt injection* en los síntomas | 2 | 2 | 4 | 📐 |
 | **T1** | Alteración de la auditoría | 1 | 3 | 3 | 📐 |
 | **I6** | Tráfico sin cifrar en producción | 1 | 3 | 3 | ❌ |
+| **I8** | Datos clínicos guardados o procesados por el proveedor de IA | 1 | 3 | 3 | 📐 |
 | **I7** | Enumeración de pacientes | 1 | 2 | 2 | ⚠️ aceptado |
 
 **S1 es el riesgo más alto, y del que dependen otros tres** (I7, E1 y la mitad de R1): mientras
@@ -168,10 +172,14 @@ la aplicación no valide tokens, los scopes del contrato no protegen nada.
 | 4 | Límite de solicitudes y de tamaño de cuerpo en el Ingress | D1, D4 | Sesión 16 (resiliencia) |
 | 5 | TLS en el Ingress de producción y cifrado de Secrets | I6 | Al elegir proveedor cloud |
 | 6 | Firma de imágenes y escaneo de la infraestructura como código | T3 | Sesión 10 (supply chain) |
+| 7 | Guardrails de la evaluación con IA, cada uno con su prueba | E4, I8 | Con la evaluación con IA (#123) |
+| 8 | Consentimiento informado que mencione que los datos clínicos se procesan en EE. UU. | I8 | Decisión de la Product Owner |
 
 ## 6. Lo que este modelo no cubre
 
-- **El comportamiento del modelo de IA**: sesgos, respuestas engañosas o *prompt injection* a
-  través de los síntomas escritos por el paciente. Se tratan en la sesión 13 (LLM y RAG).
+- **El comportamiento clínico del modelo de IA**: sesgos y sugerencias equivocadas. No son
+  amenazas de seguridad sino de calidad: se miden con el golden set, con resultados separados
+  por edad y sexo (#124), y los acota que la enfermera confirme siempre. El *prompt injection*
+  sí está cubierto, como E4 (ADR 0008).
 - **La seguridad del proveedor cloud**, que aún no se elige (ADR 0003).
 - **Ataques físicos o de ingeniería social** sobre el personal del centro de salud.
