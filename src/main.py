@@ -1,3 +1,4 @@
+
 """Punto de entrada de MediTriage.
 
 Arma la aplicación y la pone a escuchar. Se ejecuta con:
@@ -5,18 +6,20 @@ Arma la aplicación y la pone a escuchar. Se ejecuta con:
     python -m src.main
 """
 
+import re
 from contextlib import asynccontextmanager
+from time import perf_counter
 from uuid import uuid4
 
 import uvicorn
 from fastapi import FastAPI, Request
+from fastapi.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from src import bd, config
 from src.errores import Problema, registrar_manejadores
+from src.observabilidad import registrar_solicitud
 from src.registro.rutas import router as rutas_registro
-
-# Largo máximo del trace_id: el mismo de la columna en la outbox y en la auditoría.
-LARGO_TRACE_ID = 64
 
 
 @asynccontextmanager
@@ -38,17 +41,51 @@ app.include_router(rutas_registro)
 
 @app.middleware("http")
 async def agregar_trace_id(request: Request, siguiente):
-    """Le pone un trace_id a cada solicitud.
+    """Agrega trazabilidad, metricas HTTP y logs estructurados."""
 
-    Si el cliente ya trae uno en la cabecera X-Trace-Id, se respeta; si no, se genera.
-    Sirve para seguir una solicitud a través de los logs (factor XI del 12-Factor).
-    Se recorta a 64 caracteres: viene del cliente y termina guardado en la auditoría.
-    """
-    trace_id = request.headers.get("X-Trace-Id") or uuid4().hex[:12]
-    request.state.trace_id = trace_id[:LARGO_TRACE_ID]
-    respuesta = await siguiente(request)
-    respuesta.headers["X-Trace-Id"] = request.state.trace_id
-    return respuesta
+    trace_id = request.headers.get("X-Trace-Id", "")
+
+    if not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", trace_id):
+        trace_id = uuid4().hex[:12]
+
+    request.state.trace_id = trace_id
+
+    trace_id_log = (
+        "[REDACTED]"
+        if request.headers.get("X-Trace-Id") == trace_id
+        else trace_id
+    )
+
+    inicio = perf_counter()
+    estado = 500
+
+    try:
+        respuesta = await siguiente(request)
+        estado = respuesta.status_code
+        respuesta.headers["X-Trace-Id"] = trace_id
+        return respuesta
+
+    finally:
+        ruta = request.scope.get("route")
+        ruta_normalizada = getattr(ruta, "path", "unknown")
+
+        if ruta_normalizada not in {"/metrics", "/health", "/ready"}:
+            registrar_solicitud(
+                method=request.method,
+                route=ruta_normalizada,
+                status=estado,
+                duration=perf_counter() - inicio,
+                trace_id=trace_id_log,
+            )
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    """Expone las metricas en formato Prometheus."""
+    return Response(
+        content=generate_latest(),
+        headers={"Content-Type": CONTENT_TYPE_LATEST},
+    )
 
 
 @app.get("/health", include_in_schema=False)
@@ -74,4 +111,9 @@ def ready():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=config.PUERTO)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=config.PUERTO,
+        access_log=False,
+    )

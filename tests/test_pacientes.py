@@ -95,9 +95,13 @@ def test_se_respeta_el_trace_id_del_cliente():
     assert respuesta.headers["X-Trace-Id"] == "abc123"
 
 
-def test_un_trace_id_demasiado_largo_se_recorta():
+def test_un_trace_id_demasiado_largo_se_reemplaza():
+    # Viene del cliente y termina guardado en la auditoría, en una columna de 64 caracteres.
+    # Uno inválido no se recorta: se reemplaza por uno generado (#148).
     respuesta = cliente.get("/health", headers={"X-Trace-Id": "x" * 500})
-    assert respuesta.headers["X-Trace-Id"] == "x" * 64
+    trace_id = respuesta.headers["X-Trace-Id"]
+    assert trace_id != "x" * 64
+    assert len(trace_id) <= 64
 
 
 # --- Persistencia -----------------------------------------------------------------------
