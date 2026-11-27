@@ -1,10 +1,9 @@
 {
-  "patient_id": "12345678-5",
-  "vitals": {
-    "heart_rate": 115,
-    "blood_pressure": "140/90",
-    "oxygen_saturation": 95,
-    "temperature": 38.2
+  "method": "POST",
+  "path": "/v1/encuentros/2b8f6d1c-9e4a-4f7b-8c3d-5a6e7f8091a2/evaluaciones",
+  "headers": {
+    "Authorization": "Bearer <token con scope triage:write>",
+    "Idempotency-Key": "a3b4c5d6-e7f8-4a9b-8c0d-1e2f3a4b5c6d"
   },
-  "symptoms_summary": "Dolor torácico agudo con irradiación al brazo izquierdo."
+  "body": null
 }
