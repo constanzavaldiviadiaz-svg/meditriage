@@ -2,7 +2,7 @@
 
 ## Estado
 
-Propuesto — 09/10/2026
+Aceptado — 20/11/2026
 
 Este ADR **modifica el ADR 0003 en un punto**: la decisión sobre CQRS. El resto del ADR 0003
 sigue vigente.
