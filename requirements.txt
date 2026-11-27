@@ -3,4 +3,3 @@ fastapi==0.165.0
 uvicorn==0.34.0
 starlette==1.10.0
 prometheus-client==0.22.1
-django==2.2.0  # PRUEBA #97: versión con CVE críticos, debe bloquear el SCA
