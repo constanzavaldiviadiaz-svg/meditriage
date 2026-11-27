@@ -6,7 +6,7 @@ GET /v1/auditoria/decisiones y GET /v1/auditoria/decisiones/{decisionId}. Los pe
 
 import base64
 import binascii
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Query
@@ -28,9 +28,21 @@ def _decodificar_cursor(cursor):
         texto = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4)).decode()
     except (binascii.Error, UnicodeDecodeError, ValueError):
         return None
-    if not texto.isdigit() or int(texto) < 1:
+    # La secuencia es un bigint de PostgreSQL: un número más grande no es un cursor válido.
+    if not texto.isdigit() or not 1 <= int(texto) <= BIGINT_MAXIMO:
         return None
     return int(texto)
+
+
+BIGINT_MAXIMO = 2**63 - 1
+
+
+def _en_utc(momento):
+    """Una fecha sin zona horaria se entiende en UTC, para poder compararla con otra que sí
+    la trae."""
+    if momento is not None and momento.tzinfo is None:
+        return momento.replace(tzinfo=UTC)
+    return momento
 
 
 @router.get("/v1/auditoria/decisiones", response_model=PaginaDecisiones)
@@ -40,6 +52,7 @@ def consultar_decisiones(
     cursor: str | None = None,
     limite: int = Query(default=50, ge=1, le=100),
 ):
+    desde, hasta = _en_utc(desde), _en_utc(hasta)
     if desde and hasta and desde >= hasta:
         raise Problema("rango-invalido", "Rango inválido", 422,
                        "La fecha desde tiene que ser anterior a la fecha hasta.")

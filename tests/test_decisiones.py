@@ -195,3 +195,22 @@ def test_la_api_no_usa_la_credencial_de_escritura(monkeypatch):
 
     assert respuesta.status_code == 200
     assert len(respuesta.json()["datos"]) == 1
+
+
+def test_fechas_con_y_sin_zona_horaria_no_rompen():
+    # "desde" sin zona horaria se entiende en UTC, igual que "hasta".
+    respuesta = decisiones(desde="2026-01-01T00:00:00", hasta="2026-01-02T00:00:00Z")
+
+    assert respuesta.status_code == 200
+    assert decisiones(desde="2026-01-02T00:00:00", hasta="2026-01-01T00:00:00Z").status_code == 422
+
+
+def test_un_cursor_fuera_de_rango_da_422():
+    import base64
+
+    enorme = base64.urlsafe_b64encode(b"99999999999999999999").rstrip(b"=").decode()
+
+    respuesta = decisiones(cursor=enorme)
+
+    assert respuesta.status_code == 422
+    assert respuesta.json()["type"] == URL_PROBLEMAS + "cursor-invalido"

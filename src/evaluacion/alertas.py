@@ -48,14 +48,20 @@ class Alerta:
     umbral: str   # la regla que la disparó, p. ej. "SatO2 < 90"
 
 
+def _edad_conocida(edad_dias):
+    """Una edad negativa (fecha de nacimiento futura, por un error de digitación) se trata
+    como desconocida."""
+    return edad_dias is not None and edad_dias >= 0
+
+
 def _tramo(edad_dias):
-    if edad_dias is None:
+    if not _edad_conocida(edad_dias):
         return TRAMOS[-1]
     return [t for t in TRAMOS if edad_dias >= t[0]][-1]
 
 
 def _es_adulto(edad_dias):
-    return edad_dias is None or edad_dias >= ADULTO_DESDE_DIAS
+    return not _edad_conocida(edad_dias) or edad_dias >= ADULTO_DESDE_DIAS
 
 
 def calcular_alertas(signos, edad_dias):

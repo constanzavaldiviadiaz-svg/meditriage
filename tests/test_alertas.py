@@ -121,3 +121,10 @@ def test_sin_frecuencia_respiratoria_no_alerta_por_ella():
 def test_cada_alerta_dice_el_umbral_que_la_disparo():
     [alerta] = calcular_alertas(signos(frecuenciaCardiaca=161), 400)
     assert alerta.umbral == "FC > 160 (3 meses a 3 años)"
+
+
+def test_una_edad_negativa_no_rompe_y_usa_umbrales_de_adulto():
+    # Una fecha de nacimiento futura (error de digitación) deja la edad negativa.
+    assert niveles(calcular_alertas(signos(frecuenciaCardiaca=151), -5)) == {
+        "frecuencia_cardiaca": "critico"
+    }
