@@ -166,6 +166,19 @@ def test_si_la_ia_tarda_mas_que_el_limite_deriva_por_timeout(monkeypatch):
     assert respuesta.json()["duracionMs"] >= 200
 
 
+
+def test_el_limite_de_3_segundos_es_total_aunque_el_motor_no_lo_respete(monkeypatch):
+    # El SDK aplica el timeout a cada fase de la conexión, no al total: una respuesta puede
+    # llegar después del límite. El servicio corta la espera igual (HU06).
+    monkeypatch.setattr(config, "TIMEOUT_IA", 0.2)
+    motor.simulador.modo = "colgado"
+
+    respuesta = evaluar(encuentro_con_datos())
+
+    assert respuesta.json()["resultado"] == "derivado_triage_manual"
+    assert respuesta.json()["motivo"] == "timeout"
+    assert respuesta.json()["duracionMs"] < 500
+
 def test_tras_una_derivacion_se_asigna_triage_manual():
     motor.simulador.modo = "caido"
     encuentro_id = encuentro_con_datos()

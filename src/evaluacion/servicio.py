@@ -10,6 +10,7 @@ La derivación no es un error: es el resultado previsto, y la enfermera sigue si
 """
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from time import perf_counter
 
 from pydantic import BaseModel, Field, ValidationError
@@ -24,6 +25,23 @@ class SalidaIa(BaseModel):
 
     categoriaEsi: int = Field(ge=1, le=5)
     justificacion: Justificacion
+
+
+# Hilos para las llamadas a la IA. Si una se pasa del plazo, la respuesta al cliente no la
+# espera; el hilo termina solo cuando el SDK corta la conexión.
+_hilos = ThreadPoolExecutor(max_workers=8, thread_name_prefix="motor-ia")
+
+
+def _con_plazo(funcion, plazo):
+    """El resultado de `funcion`, o FallaMotor("timeout") si no termina en `plazo` segundos.
+
+    El SDK aplica su timeout a cada fase de la conexión (conectar, enviar, recibir), no al
+    total: con una conexión nueva, la suma puede pasar de 3 s. HU06 exige 3 s en total."""
+    futuro = _hilos.submit(funcion)
+    try:
+        return futuro.result(timeout=plazo)
+    except TimeoutError:
+        raise motor.FallaMotor("timeout") from None
 
 
 def _validar(respuesta):
@@ -49,7 +67,9 @@ def evaluar(encuentro, trace_id):
     if not breaker.circuito.permite():
         return derivar("servicio_no_disponible")
     try:
-        respuesta = motor.obtener().sugerir(datos, config.TIMEOUT_IA)
+        sugeridor = motor.obtener()
+        respuesta = _con_plazo(lambda: sugeridor.sugerir(datos, config.TIMEOUT_IA),
+                               config.TIMEOUT_IA)
     except motor.FallaMotor as falla:
         breaker.circuito.falla()
         return derivar(falla.motivo)

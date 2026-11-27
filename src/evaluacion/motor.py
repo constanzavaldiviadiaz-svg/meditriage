@@ -92,6 +92,10 @@ class Simulador:
         if self.modo == "lento":
             time.sleep(timeout)
             raise FallaMotor("timeout")
+        if self.modo == "colgado":
+            # Responde bien, pero tarde, sin respetar el timeout: como el SDK cuando la suma
+            # de las fases de la conexión pasa el límite.
+            time.sleep(timeout * 5)
 
         signos = solicitud.get("signosVitales") or {}
         saturacion = signos.get("saturacionOxigeno") or 100
