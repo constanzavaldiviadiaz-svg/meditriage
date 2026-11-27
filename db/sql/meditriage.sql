@@ -69,6 +69,39 @@ CREATE TABLE clinico.outbox_evento (
 CREATE INDEX outbox_pendientes ON clinico.outbox_evento (creado_en)
   WHERE publicado_en IS NULL;
 
+-- Encuentro: una visita del paciente a la sala de espera, de la llegada a la atención (HU02).
+-- Guarda el paciente_id y no el RUT ni el nombre: esos viven solo en el contexto de identidad.
+-- La edad (en días) y el sexo son una foto tomada al abrir el encuentro, para que la
+-- evaluación no tenga que consultar el contexto de identidad dentro de los 3 segundos.
+CREATE TYPE clinico.estado_encuentro AS ENUM (
+  'abierto', 'en_espera', 'evaluado', 'derivado_triage_manual', 'confirmado', 'atendido'
+);
+
+CREATE TABLE clinico.encuentro (
+  encuentro_id    uuid PRIMARY KEY,
+  paciente_id     uuid NOT NULL,
+  estado          clinico.estado_encuentro NOT NULL,
+  abierto_en      timestamptz NOT NULL,
+  cerrado_en      timestamptz,
+  -- Nullable: el encuentro se abre antes de registrar los datos clínicos.
+  motivo_consulta varchar(500),
+  edad_dias       integer,
+  sexo            varchar(10)
+);
+
+-- Un paciente tiene a lo sumo un encuentro sin atender. Dos aperturas simultáneas (dos
+-- enfermeras, dos réplicas) dejan uno solo.
+CREATE UNIQUE INDEX un_encuentro_activo ON clinico.encuentro (paciente_id)
+  WHERE estado <> 'atendido';
+
+-- Idempotencia de POST /v1/encuentros, igual que en el registro de pacientes.
+CREATE TABLE clinico.solicitud_encuentro (
+  clave        uuid PRIMARY KEY,
+  hash_cuerpo  char(64) NOT NULL,
+  encuentro_id uuid NOT NULL REFERENCES clinico.encuentro,
+  creado_en    timestamptz NOT NULL DEFAULT now()
+);
+
 -- ---------------------------------------------------------------- Permisos
 
 GRANT USAGE ON SCHEMA identidad, clinico TO meditriage_app;
@@ -77,3 +110,6 @@ GRANT SELECT, INSERT ON identidad.paciente, identidad.consentimiento,
 GRANT SELECT, INSERT ON clinico.outbox_evento TO meditriage_app;
 -- De un evento ya guardado solo se puede marcar que se publicó.
 GRANT UPDATE (publicado_en) ON clinico.outbox_evento TO meditriage_app;
+GRANT SELECT, INSERT ON clinico.encuentro, clinico.solicitud_encuentro TO meditriage_app;
+-- Del encuentro solo cambian el estado y el motivo de consulta.
+GRANT UPDATE (estado, motivo_consulta) ON clinico.encuentro TO meditriage_app;

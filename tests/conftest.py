@@ -86,10 +86,12 @@ def bases():
 def base_limpia(bases):
     """Cada prueba parte con las tablas vacías."""
     with admin(BASE_PRINCIPAL) as conexion:
-        conexion.execute(
-            "TRUNCATE identidad.solicitud_registro, identidad.consentimiento,"
-            " identidad.paciente, clinico.outbox_evento"
-        )
+        # Todas las tablas de los dos contextos, para no tener que mantener la lista a mano.
+        tablas = conexion.execute(
+            "SELECT string_agg(format('%I.%I', schemaname, tablename), ', ')"
+            " FROM pg_tables WHERE schemaname IN ('identidad', 'clinico')"
+        ).fetchone()[0]
+        conexion.execute(f"TRUNCATE {tablas}")
     with admin(BASE_AUDITORIA) as conexion:
         # El trigger rechaza TRUNCATE. Solo un superusuario puede saltárselo, y solo aquí.
         conexion.execute("SET session_replication_role = replica")
