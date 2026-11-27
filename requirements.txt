@@ -1,3 +1,4 @@
 # Dependencias de producción: lo que va dentro de la imagen Docker.
 fastapi==0.115.6
 uvicorn==0.34.0
+prometheus-client==0.22.1
