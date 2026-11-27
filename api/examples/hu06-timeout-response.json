@@ -1,5 +1,8 @@
 {
-  "error_code": "IA_TIMEOUT",
-  "message": "El motor de IA superó el tiempo máximo de espera (3 segundos). Se recomienda fallback a triage manual.",
-  "status": 504
+  "evaluacionId": "9d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
+  "encuentroId": "2b8f6d1c-9e4a-4f7b-8c3d-5a6e7f8091a2",
+  "resultado": "derivado_triage_manual",
+  "motivo": "timeout",
+  "duracionMs": 3000,
+  "generadaEn": "2026-10-08T14:22:34Z"
 }

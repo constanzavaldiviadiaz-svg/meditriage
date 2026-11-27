@@ -1,5 +1,16 @@
 {
-  "rut": "12345678-0",
-  "full_name": "Juan Pérez",
-  "consent_accepted": true
+  "method": "POST",
+  "path": "/v1/pacientes",
+  "headers": {
+    "Authorization": "Bearer <token con scope pacientes:write>",
+    "Content-Type": "application/json",
+    "Idempotency-Key": "6f1d2c3b-4a5e-4b6c-9d7e-8f9a0b1c2d3e"
+  },
+  "body": {
+    "rut": "12345678-0",
+    "nombre": "Paciente de Prueba",
+    "consentimiento": {
+      "estado": "otorgado"
+    }
+  }
 }
