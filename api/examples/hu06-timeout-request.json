@@ -1,6 +1,9 @@
 {
-  "triage_id": "b1a2c3d4-5678-90ab-cdef-1234567890ab",
-  "patient_id": "12345678-5",
-  "vitals_summary": "HR: 115, BP: 140/90",
-  "symptoms_summary": "Dolor torácico agudo"
+  "method": "POST",
+  "path": "/v1/encuentros/2b8f6d1c-9e4a-4f7b-8c3d-5a6e7f8091a2/evaluaciones",
+  "headers": {
+    "Authorization": "Bearer <token con scope triage:write>",
+    "Idempotency-Key": "b4c5d6e7-f8a9-4b0c-9d1e-2f3a4b5c6d7e"
+  },
+  "body": null
 }
