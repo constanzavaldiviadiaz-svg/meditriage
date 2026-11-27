@@ -57,7 +57,10 @@ def _abrir(datos, clave, trace_id):
     try:
         return encuentros.abrir(datos.pacienteId, edad_dias, paciente.sexo, clave,
                                 encuentros.hash_cuerpo(datos), trace_id)
-    except encuentros.EncuentroAbierto as error:
+    except encuentros.EncuentroAbierto:
+        # El id se busca de nuevo, en vez de tomarlo de la excepción: una respuesta de error
+        # nunca se arma con la excepción capturada (regla meditriage-error-filtra-excepcion).
+        existente = encuentros.activo(datos.pacienteId)
         raise Problema("encuentro-abierto", "Encuentro abierto", 409,
                        "El paciente ya tiene un encuentro sin atender.",
-                       encuentroId=str(error.encuentro_id)) from None
+                       encuentroId=str(existente)) from None

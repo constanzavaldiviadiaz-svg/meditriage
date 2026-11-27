@@ -65,7 +65,8 @@ def buscar_por_clave(clave):
     return fila[0], _a_encuentro(fila[1:])
 
 
-def _activo(paciente_id):
+def activo(paciente_id):
+    """El encuentro sin atender del paciente, o None."""
     with bd.principal() as conexion:
         fila = conexion.execute(
             "SELECT encuentro_id FROM clinico.encuentro"
@@ -100,7 +101,7 @@ def abrir(paciente_id, edad_dias, sexo, clave, hash_del_cuerpo, trace_id):
                                     (encuentro_id,)).fetchone()
     except errors.UniqueViolation as error:
         if error.diag.constraint_name == "un_encuentro_activo":
-            raise EncuentroAbierto(_activo(paciente_id)) from None
+            raise EncuentroAbierto(activo(paciente_id)) from None
         raise Duplicado from None
     return _a_encuentro(fila)
 
