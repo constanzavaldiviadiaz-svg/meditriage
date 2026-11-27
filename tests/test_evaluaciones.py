@@ -1,7 +1,8 @@
 """Pruebas del repositorio de evaluaciones (HU03 y HU06).
 
-La ruta que pide la evaluación al motor de IA llega con el #123. Aquí se prueba lo que ella
-va a usar: guardar la sugerencia o la derivación, con su evento, en una transacción.
+La ruta que pide la evaluación al motor de IA se prueba en test_evaluacion_ia.py. Aquí se
+prueba lo que ella usa: guardar la sugerencia o la derivación, con su evento, en una
+transacción.
 """
 
 import pytest
@@ -67,6 +68,8 @@ def test_guardar_sugerencia_pasa_a_evaluado_y_encola_triage_completed():
         "categoriaEsi": 2,
         "justificacion": justificacion_de_prueba().model_dump(),
         "duracionMs": 850,
+        "modelo": "modelo-x",
+        "versionPrompt": "v1",
     }
 
 

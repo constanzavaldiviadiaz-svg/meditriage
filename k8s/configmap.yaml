@@ -6,3 +6,6 @@ metadata:
   namespace: meditriage
 data:
   AMBIENTE: "produccion"
+  # El motor de IA (ADR 0008): "claude" o "simulador". Con "claude", la clave viene del Secret
+  # meditriage-ia, que crea Terraform (terraform/ia.tf).
+  MOTOR_IA: "simulador"

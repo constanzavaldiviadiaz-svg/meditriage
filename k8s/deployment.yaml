@@ -51,6 +51,19 @@ spec:
                 secretKeyRef:
                   name: meditriage-auditoria-lectura
                   key: AUDITORIA_LECTURA_URL
+            # El motor de IA. La clave es opcional: sin el Secret, el pod arranca igual y con
+            # MOTOR_IA=simulador no la necesita.
+            - name: MOTOR_IA
+              valueFrom:
+                configMapKeyRef:
+                  name: meditriage-config
+                  key: MOTOR_IA
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: meditriage-ia
+                  key: ANTHROPIC_API_KEY
+                  optional: true
           resources:
             requests:
               cpu: "200m"

@@ -84,3 +84,35 @@ def _encolar_eventos(conexion, encuentro_id, signos_id, medido_en, cantidad_sint
             encolar(conexion, "vitals.critical_detected", encuentro_id, trace_id,
                     {"encuentroId": encuentro, "signo": alerta.signo, "nivel": alerta.nivel,
                      "umbralAplicado": alerta.umbral})
+
+
+_SIGNOS = ("presionSistolica", "presionDiastolica", "frecuenciaCardiaca",
+           "frecuenciaRespiratoria", "temperatura", "saturacionOxigeno")
+
+
+def ultimos(encuentro_id):
+    """Lo que la evaluación necesita: la edad y el sexo del encuentro, el motivo, los síntomas y
+    la última medición. None si todavía no tiene datos clínicos."""
+    with bd.principal() as conexion:
+        encuentro = conexion.execute(
+            "SELECT edad_dias, sexo, motivo_consulta FROM clinico.encuentro"
+            " WHERE encuentro_id = %s", (encuentro_id,)).fetchone()
+        signos = conexion.execute(
+            "SELECT presion_sistolica, presion_diastolica, frecuencia_cardiaca,"
+            " frecuencia_respiratoria, temperatura, saturacion_oxigeno"
+            " FROM clinico.signos_vitales WHERE encuentro_id = %s"
+            " ORDER BY medido_en DESC LIMIT 1", (encuentro_id,)).fetchone()
+        sintomas = conexion.execute(
+            "SELECT descripcion FROM clinico.sintoma WHERE encuentro_id = %s",
+            (encuentro_id,)).fetchall()
+    if encuentro is None or signos is None:
+        return None
+    edad_dias, sexo, motivo = encuentro
+    return {
+        "edad_dias": edad_dias,
+        "sexo": sexo,
+        "motivo": motivo,
+        "sintomas": [s for (s,) in sintomas],
+        "signos": {nombre: (float(v) if nombre == "temperatura" and v is not None else v)
+                   for nombre, v in zip(_SIGNOS, signos, strict=True)},
+    }
