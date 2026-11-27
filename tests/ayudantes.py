@@ -65,3 +65,31 @@ def registrar_datos(cliente, encuentro_id, **signos):
                             json=datos_clinicos(**signos))
     assert respuesta.status_code == 200, respuesta.text
     return respuesta.json()
+
+
+def justificacion_de_prueba():
+    from src.evaluacion.modelos import Factor, Justificacion
+
+    return Justificacion(
+        resumen="Saturación baja con dificultad respiratoria.",
+        factores=[Factor(factor="saturacion_oxigeno", descripcion="85 %, bajo el umbral")],
+    )
+
+
+def evaluar(encuentro_id, categoria=2):
+    """Simula la sugerencia del motor de IA (lo que hará el #123) y devuelve su evaluacionId."""
+    from src.evaluacion import encuentros, evaluaciones
+
+    sugerencia = evaluaciones.guardar_sugerencia(
+        encuentros.obtener(encuentro_id), categoria, justificacion_de_prueba(), 850,
+        "modelo-de-prueba", "v1", f'{{"categoria": {categoria}}}', "traza-prueba")
+    return sugerencia.evaluacionId
+
+
+def derivar(encuentro_id, motivo="timeout"):
+    """Simula una derivación a triage manual y devuelve su evaluacionId."""
+    from src.evaluacion import encuentros, evaluaciones
+
+    derivacion = evaluaciones.guardar_derivacion(
+        encuentros.obtener(encuentro_id), motivo, 3000, "traza-prueba")
+    return derivacion.evaluacionId

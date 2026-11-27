@@ -6,7 +6,7 @@ campos.
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -61,3 +61,34 @@ class DatosClinicos(BaseModel):
     encuentroId: UUID
     registradoEn: datetime
     alertas: list[AlertaSignoVital]
+
+
+class Factor(BaseModel):
+    factor: str
+    descripcion: str
+
+
+class Justificacion(BaseModel):
+    """Por qué la IA sugiere esa categoría: un resumen y al menos un factor (explicabilidad)."""
+
+    resumen: str
+    factores: list[Factor] = Field(min_length=1)
+
+
+class SugerenciaIa(BaseModel):
+    evaluacionId: UUID
+    encuentroId: UUID
+    resultado: Literal["sugerencia_ia"] = "sugerencia_ia"
+    categoriaEsi: int = Field(ge=1, le=5)
+    justificacion: Justificacion
+    duracionMs: int = Field(ge=0)
+    generadaEn: datetime
+
+
+class DerivacionManual(BaseModel):
+    evaluacionId: UUID
+    encuentroId: UUID
+    resultado: Literal["derivado_triage_manual"] = "derivado_triage_manual"
+    motivo: Literal["timeout", "servicio_no_disponible", "respuesta_invalida"]
+    duracionMs: int = Field(ge=0)
+    generadaEn: datetime

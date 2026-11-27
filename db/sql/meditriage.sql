@@ -133,6 +133,24 @@ CREATE TABLE clinico.alerta_signo_vital (
   umbral            varchar(60) NOT NULL
 );
 
+-- Evaluación: la sugerencia del motor de IA o la derivación a triage manual (HU03, HU06).
+-- Guarda la respuesta exacta del modelo, porque no es determinista: la auditoría tiene que
+-- poder mostrar lo mismo que vio la enfermera (ADR 0002).
+CREATE TABLE clinico.evaluacion (
+  evaluacion_id         uuid PRIMARY KEY,
+  encuentro_id          uuid NOT NULL REFERENCES clinico.encuentro,
+  resultado             varchar(30) NOT NULL,
+  categoria_sugerida    smallint,
+  justificacion         jsonb,
+  motivo_derivacion     varchar(30),
+  duracion_ms           integer NOT NULL,
+  modelo                varchar(100),
+  version_prompt        varchar(30),
+  respuesta_ia_original text,
+  generada_en           timestamptz NOT NULL,
+  trace_id              varchar(64)
+);
+
 -- ---------------------------------------------------------------- Permisos
 
 GRANT USAGE ON SCHEMA identidad, clinico TO meditriage_app;
@@ -148,3 +166,4 @@ GRANT SELECT, INSERT ON clinico.signos_vitales, clinico.sintoma, clinico.alerta_
   TO meditriage_app;
 -- Los síntomas se reemplazan en cada registro de datos clínicos.
 GRANT DELETE ON clinico.sintoma TO meditriage_app;
+GRANT SELECT, INSERT ON clinico.evaluacion TO meditriage_app;
