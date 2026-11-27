@@ -119,6 +119,21 @@ jobs:
         run: |
           echo "Image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/meditriage-api@${{ steps.publish.outputs.digest }}"
 
+      - name: Generar SBOM de la imagen
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/meditriage-api@${{ steps.publish.outputs.digest }}
+          format: cyclonedx-json
+          output-file: sbom.json
+          upload-artifact: false
+
+      - name: Publicar el SBOM como artefacto
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-cyclonedx
+          path: sbom.json
+          retention-days: 90
+
       - name: Install Cosign
         uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
 
