@@ -1,0 +1,57 @@
+@startuml l3-evaluacion
+!include <C4/C4_Component>
+
+title MediTriage — C4 Nivel 3: Componentes del módulo de Evaluación
+
+Person(enfermera, "Enfermera de triage", "Pide la sugerencia ESI y decide la categoría final")
+
+Container_Boundary(web, "Aplicación web · módulo de Evaluación") {
+  Component(rutas, "Rutas de evaluación", "FastAPI", "POST /v1/encuentros/{id}/evaluaciones y su confirmación. Idempotencia por Idempotency-Key.")
+  Component(servicio, "Servicio de evaluación", "Python", "Orquesta cada evaluación dentro de los 3 s y decide entre sugerencia y derivación a triage manual (HU06).")
+  Component(solicitud, "Constructor de la solicitud", "Python", "Arma lo mínimo: edad, sexo, signos vitales y síntomas. Borra los RUT escritos en el texto libre (G1).")
+  Component(breaker, "Circuit breaker", "Python", "Tras varias fallas seguidas deja de llamar a la IA por un tiempo, y el servicio deriva de inmediato (ADR 0003).")
+  Component(puerto, "SugeridorEsi", "Interfaz", "Lo único que el servicio conoce de la IA. Otro proveedor es otra implementación (ADR 0008).")
+  Component(claude, "Cliente de Claude", "SDK anthropic", "Prompt versionado con los síntomas como datos (G2), salida estructurada, timeout de 3 s, sin reintentos. Modelo en MODELO_IA.")
+  Component(simulador, "Simulador de IA", "Python", "Para desarrollo y pruebas: respuestas, demoras y fallas configurables. No gasta créditos.")
+  Component(validador, "Validador de la respuesta", "Python", "Esquema JSON, ESI de 1 a 5, justificación y stop_reason end_turn. Si algo no calza, se deriva (G3).")
+  Component(confirmacion, "Confirmación", "Python", "La enfermera decide. Una categoría distinta de la sugerida exige justificación (G4).")
+  Component(repo, "Repositorio de evaluaciones", "psycopg", "Guarda la evaluación y su evento en la outbox, en la misma transacción: respuesta exacta, modelo, versión del prompt y trace_id (G5).")
+}
+
+ContainerDb(db, "Base de datos clínica", "PostgreSQL", "Encuentros, evaluaciones, categorías finales y outbox")
+Container(worker, "Worker de auditoría", "Python", "Lleva los eventos de la outbox a la auditoría append-only (ADR 0004)")
+System_Ext(ia, "Servicio de IA", "API de Claude, de Anthropic, con inferencia en EE. UU. (ADR 0008)")
+
+Rel(enfermera, rutas, "Pide la sugerencia y confirma la categoría", "HTTPS")
+Rel(rutas, servicio, "Solicita la evaluación")
+Rel(rutas, confirmacion, "Envía la categoría final")
+Rel(servicio, solicitud, "Arma la solicitud")
+Rel(servicio, breaker, "Pide la sugerencia")
+Rel(breaker, puerto, "Llama, si el circuito está cerrado")
+Rel_U(claude, puerto, "Implementa")
+Rel_U(simulador, puerto, "Implementa")
+Rel(claude, ia, "Datos clínicos sin identificación / ESI y justificación", "HTTPS")
+Rel(servicio, validador, "Valida la respuesta")
+Rel(servicio, repo, "Guarda la sugerencia o la derivación")
+Rel(confirmacion, repo, "Guarda la categoría final")
+Rel(repo, db, "Evaluación y evento, en una transacción", "SQL/TLS")
+Rel(worker, db, "Lee los eventos pendientes", "SQL/TLS")
+
+note right of ia
+  Nunca se envían RUT ni nombre (G1).
+  Falco alerta si la aplicación
+  se conecta a otro destino.
+end note
+
+note bottom of servicio
+  Deriva a triage manual si:
+  · pasan 3 s,
+  · la API falla,
+  · el circuito está abierto, o
+  · la respuesta no es válida.
+  La derivación es un 201,
+  no un error.
+end note
+
+SHOW_LEGEND()
+@enduml
