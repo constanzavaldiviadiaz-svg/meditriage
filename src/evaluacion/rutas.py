@@ -6,8 +6,13 @@ from uuid import UUID
 from fastapi import APIRouter, Header, Request, Response
 
 from src.errores import Problema
-from src.evaluacion import encuentros
-from src.evaluacion.modelos import AbrirEncuentroInput, Encuentro
+from src.evaluacion import datos_clinicos, encuentros
+from src.evaluacion.modelos import (
+    AbrirEncuentroInput,
+    DatosClinicos,
+    DatosClinicosInput,
+    Encuentro,
+)
 from src.registro import almacen
 
 router = APIRouter(tags=["Encuentros"])
@@ -64,3 +69,39 @@ def _abrir(datos, clave, trace_id):
         raise Problema("encuentro-abierto", "Encuentro abierto", 409,
                        "El paciente ya tiene un encuentro sin atender.",
                        encuentroId=str(existente)) from None
+
+
+# Lo que el contrato exige para evaluar un caso, en el orden en que se informa.
+SIGNOS_OBLIGATORIOS = ["presionSistolica", "presionDiastolica", "frecuenciaCardiaca",
+                       "temperatura", "saturacionOxigeno"]
+
+
+def campos_faltantes(datos):
+    """Los campos obligatorios que faltan. Un motivo de consulta en blanco cuenta como falta."""
+    faltantes = []
+    if not (datos.motivoConsulta or "").strip():
+        faltantes.append("motivoConsulta")
+    signos = datos.signosVitales
+    faltantes += [f"signosVitales.{campo}" for campo in SIGNOS_OBLIGATORIOS
+                  if signos is None or getattr(signos, campo) is None]
+    return faltantes
+
+
+@router.put("/v1/encuentros/{encuentro_id}/datos-clinicos", response_model=DatosClinicos)
+def registrar_datos_clinicos(encuentro_id: UUID, datos: DatosClinicosInput, request: Request):
+    # Cuando el código llega aquí, FastAPI ya revisó tipos y rangos (si no, respondió 400).
+    encuentro = encuentros.obtener(encuentro_id)
+    if encuentro is None:
+        raise _no_encontrado("No existe un encuentro con ese encuentroId.")
+
+    faltantes = campos_faltantes(datos)
+    if faltantes:
+        detalle = (
+            "Falta el motivo de consulta. El caso no se envió al motor de evaluación."
+            if faltantes == ["motivoConsulta"]
+            else "Faltan datos obligatorios. El caso no se envió al motor de evaluación."
+        )
+        raise Problema("datos-clinicos-incompletos", "Datos clínicos incompletos", 422,
+                       detalle, camposFaltantes=faltantes)
+
+    return datos_clinicos.registrar(encuentro, datos, request.state.trace_id)

@@ -102,6 +102,37 @@ CREATE TABLE clinico.solicitud_encuentro (
   creado_en    timestamptz NOT NULL DEFAULT now()
 );
 
+-- Datos clínicos (HU02). Cada PUT agrega una medición nueva de signos vitales: quedan todas,
+-- para la reevaluación. Los síntomas se reemplazan.
+CREATE TABLE clinico.signos_vitales (
+  signos_vitales_id       uuid PRIMARY KEY,
+  encuentro_id            uuid NOT NULL REFERENCES clinico.encuentro,
+  presion_sistolica       smallint NOT NULL,
+  presion_diastolica      smallint NOT NULL,
+  frecuencia_cardiaca     smallint NOT NULL,
+  frecuencia_respiratoria smallint,
+  temperatura             numeric(4, 1) NOT NULL,
+  saturacion_oxigeno      smallint NOT NULL,
+  medido_en               timestamptz NOT NULL
+);
+
+CREATE TABLE clinico.sintoma (
+  sintoma_id   uuid PRIMARY KEY,
+  encuentro_id uuid NOT NULL REFERENCES clinico.encuentro,
+  descripcion  varchar(200) NOT NULL
+);
+
+-- Las alertas que vio la enfermera, con el umbral vigente en ese momento: si los umbrales
+-- cambian, la historia no se reescribe.
+CREATE TABLE clinico.alerta_signo_vital (
+  alerta_id         uuid PRIMARY KEY,
+  signos_vitales_id uuid NOT NULL REFERENCES clinico.signos_vitales,
+  signo             varchar(30) NOT NULL,
+  valor             varchar(20) NOT NULL,
+  nivel             varchar(15) NOT NULL,
+  umbral            varchar(60) NOT NULL
+);
+
 -- ---------------------------------------------------------------- Permisos
 
 GRANT USAGE ON SCHEMA identidad, clinico TO meditriage_app;
@@ -113,3 +144,7 @@ GRANT UPDATE (publicado_en) ON clinico.outbox_evento TO meditriage_app;
 GRANT SELECT, INSERT ON clinico.encuentro, clinico.solicitud_encuentro TO meditriage_app;
 -- Del encuentro solo cambian el estado y el motivo de consulta.
 GRANT UPDATE (estado, motivo_consulta) ON clinico.encuentro TO meditriage_app;
+GRANT SELECT, INSERT ON clinico.signos_vitales, clinico.sintoma, clinico.alerta_signo_vital
+  TO meditriage_app;
+-- Los síntomas se reemplazan en cada registro de datos clínicos.
+GRANT DELETE ON clinico.sintoma TO meditriage_app;

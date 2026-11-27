@@ -38,3 +38,30 @@ def abrir_encuentro(cliente, paciente_id):
                              headers={"Idempotency-Key": str(uuid4())})
     assert respuesta.status_code == 201, respuesta.text
     return UUID(respuesta.json()["encuentroId"])
+
+
+SIGNOS_NORMALES = {
+    "presionSistolica": 120,
+    "presionDiastolica": 80,
+    "frecuenciaCardiaca": 80,
+    "frecuenciaRespiratoria": 16,
+    "temperatura": 36.8,
+    "saturacionOxigeno": 98,
+}
+
+
+def datos_clinicos(motivo="Dolor torácico", sintomas=("dolor opresivo",), **signos):
+    """Un cuerpo de DatosClinicosInput con signos normales, salvo los que se cambien."""
+    return {
+        "motivoConsulta": motivo,
+        "sintomas": list(sintomas),
+        "signosVitales": SIGNOS_NORMALES | signos,
+    }
+
+
+def registrar_datos(cliente, encuentro_id, **signos):
+    """Registra datos clínicos para el encuentro y devuelve la respuesta en JSON."""
+    respuesta = cliente.put(f"/v1/encuentros/{encuentro_id}/datos-clinicos",
+                            json=datos_clinicos(**signos))
+    assert respuesta.status_code == 200, respuesta.text
+    return respuesta.json()
