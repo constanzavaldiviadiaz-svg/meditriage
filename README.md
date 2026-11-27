@@ -52,6 +52,9 @@ Representa los contenedores del sistema: las aplicaciones y bases de datos que l
 
 - [ADR 0001 — Elección de iniciativa](docs/adr/0001-eleccion-iniciativa.md).
 - [ADR 0002 — Elección del estilo arquitectónico](docs/adr/0002-estilo-arquitectonico.md).
+- [ADR 0003 — Decisión cloud y servicios gestionados](docs/adr/0003-cloud-style.md).
+- [ADR 0004 — Datos y eventos](docs/adr/0004-datos-y-eventos.md).
+- [ADR 0005 — Plataforma de despliegue: Kubernetes e infraestructura como código](docs/adr/0005-plataforma-k8s.md).
 - [Atributos de calidad](docs/arch/atributos-calidad.md) — los 3 NFRs prioritarios.
 
 ## Seguridad
