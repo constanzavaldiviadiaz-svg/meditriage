@@ -7,7 +7,7 @@ protegemos, por dónde nos pueden atacar y qué lo impide**.
 |---|---|
 | **Alcance** | El flujo de triage completo: registro del paciente, evaluación con el servicio de IA externo, confirmación de la categoría y registro en auditoría |
 | **Método** | STRIDE por elemento, con priorización por probabilidad e impacto |
-| **Fecha** | 06/11/2026 · sesión 09 |
+| **Fecha** | 06/11/2026 · sesión 09. Estados al día el 27/11/2026 (#158) |
 | **Autor** | Fernando Ureta (Tech Lead) |
 | **Revisión** | En cada release mayor, o cuando cambie un límite de confianza (regla de la sesión 09) |
 
@@ -82,7 +82,7 @@ Cada amenaza tiene un **estado**:
 
 | ID | Amenaza | Control | Estado |
 |---|---|---|---|
-| S1 | Alguien sin cuenta registra pacientes o lee datos clínicos, haciéndose pasar por una enfermera | OAuth2 con flujo *authorization code* y un *scope* por operación (`pacientes:write`, `triage:write`, `triage:read`, `auditoria:read`), definido en `api/openapi.yaml` | 📐 Está en el contrato, pero **la aplicación aún no valida tokens** (marcado `PENDIENTE` en el #67) |
+| S1 | Alguien sin cuenta registra pacientes o lee datos clínicos, haciéndose pasar por una enfermera | OAuth2 con flujo *authorization code* y un *scope* por operación (`pacientes:write`, `triage:write`, `triage:read`, `auditoria:read`), definido en `api/openapi.yaml` | 📐 Está en el contrato, pero **la aplicación aún no valida tokens** (#103) |
 | S2 | Un atacante se interpone entre la aplicación y el servicio de IA y devuelve una categoría falsa | TLS con verificación de certificado. Además, **la IA sugiere y la enfermera decide**: la evaluación y la categoría final son entidades separadas (DER) y una categoría distinta exige justificación | 📐 Diseñado (DER, contrato) |
 | S3 | Un proceso se hace pasar por el worker y escribe registros de auditoría falsos | Credencial de base de datos exclusiva del worker, con permiso solo de `INSERT` (ADR 0004, sección 5) | 📐 Diseñado |
 
@@ -94,7 +94,7 @@ Cada amenaza tiene un **estado**:
 |---|---|---|---|
 | T1 | Se modifica o borra un registro de auditoría para ocultar una decisión | Cuatro capas (ADR 0004): permisos solo `INSERT`, trigger que rechaza `UPDATE` y `DELETE`, cadena de hashes (`hashIntegridad` en el contrato) y respaldos WORM por 5 años | 📐 Diseñado |
 | T2 | Se altera un evento mientras viaja por Redis | TLS hacia Redis. PostgreSQL es la fuente de verdad (Outbox), y la auditoría se reconcilia contra la tabla outbox (ADR 0004) | 📐 Diseñado |
-| T3 | Se despliega una imagen o un manifiesto alterado | Imágenes base fijadas por digest, imagen propia referenciada por digest en `k8s/deployment.yaml`, rama `main` protegida con revisión obligatoria | ✅ Implementado. **La firma de imágenes queda para la S10** |
+| T3 | Se despliega una imagen o un manifiesto alterado | Imágenes base fijadas por digest, imagen propia referenciada por digest en `k8s/deployment.yaml`, rama `main` protegida con revisión obligatoria. Cada imagen publicada se firma con Cosign *keyless* y lleva una attestation SLSA de su origen (#139, ADR 0007) | ✅ Implementado · 📐 la verificación de la firma al desplegar (Kyverno) está en curso (#118) |
 | T4 | Se cambia la categoría sugerida por la IA sin dejar rastro del motivo | Regla de dominio `justificacion-requerida` (422) en el contrato | 📐 Diseñado |
 
 ### R — Repudiation (negar una acción)
@@ -103,7 +103,7 @@ Cada amenaza tiene un **estado**:
 
 | ID | Amenaza | Control | Estado |
 |---|---|---|---|
-| R1 | Una enfermera niega haber cambiado la categoría que sugirió la IA | La categoría final guarda su origen y su justificación (DER). **Pero el registro de auditoría (`Decision` en el contrato) no guarda quién confirmó la categoría** | ❌ **Falta**: agregar al contrato una referencia opaca a quien decidió. Es un cambio compatible según la política de versionado |
+| R1 | Una enfermera niega haber cambiado la categoría que sugirió la IA | La categoría final guarda su origen y su justificación (DER), y el registro de auditoría (`Decision` en el contrato) guarda en `confirmadaPor` una referencia opaca a quien la confirmó (#104, cambio compatible) | 📐 Está en el contrato · la aplicación lo registra con el #122 |
 | R2 | Disputa sobre qué respondió exactamente la IA | Se guarda la respuesta original de la IA (DER, `respuesta_ia_original`), el `trace_id` de cada solicitud y la versión del contrato | ✅ El `trace_id` está implementado · 📐 lo demás, diseñado |
 
 ### I — Information disclosure (filtración)
@@ -115,8 +115,8 @@ Cada amenaza tiene un **estado**:
 | I1 | El RUT o el nombre aparecen en los logs | Regla Semgrep `meditriage-pii-en-logs`, bloqueante (#95). Las respuestas devuelven el RUT enmascarado | ✅ Implementado y probado |
 | I2 | Datos personales viajan hacia el servicio de IA | Regla Semgrep `meditriage-pii-hacia-servicio-externo` (#95). El contexto clínico solo guarda el `paciente_id` (DER, ADR 0002) | ✅ Implementado y probado |
 | I3 | Un mensaje de error muestra detalles internos | Errores RFC 7807 con textos propios. Regla Semgrep `meditriage-error-filtra-excepcion` (#95) | ✅ Implementado y probado |
-| I4 | Una credencial queda en el repositorio | gitleaks sobre todo el historial (#90, #91). `.gitignore` y `.dockerignore` en lista blanca | ✅ Implementado |
-| I5 | Una dependencia con una vulnerabilidad conocida filtra datos | SCA con Trivy, bloqueante (#92). SBOM de la imagen (#93) | 📐 En curso (S09) |
+| I4 | Una credencial queda en el repositorio | Gitleaks sobre todo el historial y todas las ramas, como check obligatorio de `security.yml` (#141). `.gitignore` y `.dockerignore` en lista blanca. Inventario y rotación de cada secreto en `docs/security/secretos.md` (#150) | ✅ Implementado |
+| I5 | Una dependencia con una vulnerabilidad conocida filtra datos | SCA con Trivy, bloqueante: una CRITICAL bloquea siempre y una HIGH, si tiene parche (#143). SBOM CycloneDX de cada imagen publicada (#153) | 📐 En revisión (#143, #153) |
 | I6 | El tráfico viaja sin cifrar | En producción, TLS en el Ingress y hacia los servicios gestionados (ADR 0003). **En el clúster local, el Ingress usa HTTP.** Los Secrets de Kubernetes no se cifran por defecto (ADR 0005) | ❌ Falta configurar TLS en el Ingress de producción |
 | I7 | **Enumeración de pacientes**: registrar un RUT ya existente responde `409 paciente-ya-registrado` con su `pacienteId`, lo que revela que esa persona se atiende en la red | El endpoint exige el scope `pacientes:write`, que solo tienen las enfermeras de triage | ⚠️ **Riesgo aceptado** mientras la autenticación funcione (depende de S1). Se registran los intentos |
 
@@ -138,8 +138,8 @@ Cada amenaza tiene un **estado**:
 | ID | Amenaza | Control | Estado |
 |---|---|---|---|
 | E1 | Una enfermera consulta el historial de auditoría | Scope `auditoria:read` exclusivo del auditor clínico, y error `acceso-denegado` (HU05) | 📐 Diseñado (depende de S1) |
-| E2 | Quien comprometa la aplicación toma control del contenedor o del nodo | Imagen distroless **sin shell**, usuario **no root** (uid 65532), verificado en el #68. **Pero `k8s/deployment.yaml` no declara un `securityContext`**: Kubernetes no lo exige ni lo verifica. Si la imagen cambiara por una que corre como root, se ejecutaría igual, y el contenedor conserva los privilegios por defecto del runtime | ✅ Imagen · ❌ falta el `securityContext` |
-| E3 | Un pipeline comprometido usa sus permisos para publicar código malicioso | Permisos mínimos: `contents: read` por defecto y `packages: write` solo en el job que publica. El token del pipeline es temporal | ✅ Implementado |
+| E2 | Quien comprometa la aplicación toma control del contenedor o del nodo | Imagen distroless **sin shell**, usuario **no root** (uid 65532), verificado en el #68. Además, `k8s/deployment.yaml` declara un `securityContext` que Kubernetes hace cumplir: `runAsNonRoot`, `allowPrivilegeEscalation: false`, sistema de archivos de solo lectura, sin *capabilities* y perfil seccomp `RuntimeDefault` (#110) | ✅ Implementado |
+| E3 | Un pipeline comprometido usa sus permisos para publicar código malicioso | Permisos mínimos: `contents: read` por defecto, y `packages: write`, `id-token: write` y `attestations: write` solo en el job que publica y firma. El token del pipeline es temporal | ✅ Implementado |
 
 ## 4. Priorización
 
@@ -148,8 +148,8 @@ Probabilidad e impacto, de 1 (bajo) a 3 (alto). Riesgo = probabilidad × impacto
 | ID | Amenaza | Prob. | Impacto | Riesgo | Estado |
 |---|---|---|---|---|---|
 | **S1** | Acceso sin autenticación | 3 | 3 | **9** | 📐 |
-| **E2** | Contenedor sin `securityContext` | 2 | 3 | **6** | ❌ |
-| **R1** | Auditoría sin el autor de la decisión | 2 | 3 | **6** | ❌ |
+| **E2** | Contenedor sin `securityContext` | 2 | 3 | **6** | ✅ resuelto (#110) |
+| **R1** | Auditoría sin el autor de la decisión | 2 | 3 | **6** | 📐 en el contrato (#104) |
 | **D1** | Saturación del endpoint de evaluación | 2 | 2 | 4 | ❌ |
 | **T1** | Alteración de la auditoría | 1 | 3 | 3 | 📐 |
 | **I6** | Tráfico sin cifrar en producción | 1 | 3 | 3 | ❌ |
@@ -162,12 +162,11 @@ la aplicación no valide tokens, los scopes del contrato no protegen nada.
 
 | Prioridad | Mitigación | Amenazas | Cuándo |
 |---|---|---|---|
-| 1 | Validar tokens OAuth2 y scopes en la aplicación | S1, E1, I7 | Antes de exponer la aplicación fuera del clúster local |
-| 2 | `securityContext` en el Deployment: `runAsNonRoot`, `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`, sin *capabilities* | E2 | Inmediato: es configuración, sin código |
-| 3 | Agregar a `Decision` una referencia opaca a quien confirmó la categoría | R1 | Próximo cambio del contrato |
-| 4 | Límite de solicitudes y de tamaño de cuerpo en el Ingress | D1, D4 | Sesión 16 (resiliencia) |
-| 5 | TLS en el Ingress de producción y cifrado de Secrets | I6 | Al elegir proveedor cloud |
-| 6 | Firma de imágenes y escaneo de la infraestructura como código | T3 | Sesión 10 (supply chain) |
+| 1 | Validar tokens OAuth2 y scopes en la aplicación (#103) | S1, E1, I7 | Antes de exponer la aplicación fuera del clúster local |
+| 2 | Registrar `confirmadaPor` al confirmar la categoría (ya está en el contrato) | R1 | Con el flujo clínico (#122) |
+| 3 | Límite de solicitudes y de tamaño de cuerpo en el Ingress | D1, D4 | Sesión 16 (resiliencia) |
+| 4 | TLS en el Ingress de producción y cifrado de Secrets | I6 | Al elegir proveedor cloud |
+| 5 | Verificar la firma de la imagen al desplegar (Kyverno) y escanear la infraestructura como código (Checkov) | T3 | Sesión 10: #118 y #144, en revisión. La firma ya está en `main` (#139) |
 
 ## 6. Lo que este modelo no cubre
 
