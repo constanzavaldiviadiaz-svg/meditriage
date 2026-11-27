@@ -66,15 +66,27 @@ jobs:
           load: true
           tags: ${{ env.IMAGE }}
 
-      - name: Scan image before publishing
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+      - name: Scan image before publishing (CRITICAL, con o sin parche)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: 'v0.70.0'
           scan-type: image
           image-ref: ${{ env.IMAGE }}
           scanners: vuln
           vuln-type: 'os,library'
-          severity: 'HIGH,CRITICAL'
+          severity: 'CRITICAL'
+          exit-code: '1'
+          format: table
+
+      - name: Scan image before publishing (HIGH con parche disponible)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: 'v0.70.0'
+          scan-type: image
+          image-ref: ${{ env.IMAGE }}
+          scanners: vuln
+          vuln-type: 'os,library'
+          severity: 'HIGH'
           ignore-unfixed: true
           exit-code: '1'
           format: table
