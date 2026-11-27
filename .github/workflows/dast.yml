@@ -1,0 +1,72 @@
+name: MediTriage DAST
+
+# Análisis dinámico (DAST) con ZAP (#117, ADR 0007). Levanta la aplicación como contenedor
+# dentro del pipeline y la ataca usando el contrato OpenAPI que ella misma publica. Bloquea con
+# riesgo Medium o superior; las Low e Informational quedan en el informe.
+#
+# Va en un workflow propio, y no como job de security.yml, para no chocar con los PR del SCA
+# (#143) y del IaC scan (#144), que también modifican ese archivo.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  dast:
+    name: Analisis dinamico con ZAP
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      # ZAP 2.17.0, fijada por digest (ADR 0007): una etiqueta puede cambiar de contenido.
+      ZAP_IMAGEN: zaproxy/zap-stable@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Construir la imagen
+        run: docker build -t meditriage-api:dast .
+
+      - name: Levantar la aplicacion
+        run: |
+          docker network create dast
+          docker run -d --name app --network dast -p 8080:8080 meditriage-api:dast
+          for intento in $(seq 1 30); do
+            if curl -sf http://localhost:8080/ready > /dev/null; then
+              echo "La aplicacion respondio en /ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "La aplicacion no respondio en 60 s"
+          docker logs app
+          exit 1
+
+      # -I: ZAP no falla por sus advertencias. El umbral lo decide el paso siguiente, por
+      # riesgo. Si ZAP mismo falla (por ejemplo, no puede leer el contrato), el paso falla.
+      - name: Escanear con ZAP
+        run: |
+          mkdir -p zap
+          chmod 777 zap
+          docker run --rm --network dast -v "$PWD/zap:/zap/wrk:rw" "$ZAP_IMAGEN" \
+            zap-api-scan.py -t http://app:8080/openapi.json -f openapi \
+            -J reporte-zap.json -r reporte-zap.html -I
+
+      - name: Bloquear con riesgo Medium o superior
+        run: python3 .zap/evaluar.py zap/reporte-zap.json .zap/excepciones.tsv
+
+      - name: Publicar el informe de ZAP
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: informe-zap
+          path: zap/reporte-zap.*
+          retention-days: 90

@@ -1,0 +1,7 @@
+# Excepciones del DAST (#117). Una alerta de riesgo Medium o superior que esté aquí no bloquea.
+#
+# Formato: el id de la regla de ZAP, un tabulador y la justificación. Sin justificación, el job
+# falla. Una excepción se agrega en un PR: la propone el DevSecOps Lead y la aprueba la Product
+# Owner, como dice el README (sección "Seguridad: hallazgos y excepciones").
+#
+# Hoy no hay ninguna.
