@@ -92,8 +92,9 @@ def guardar(datos, rut, clave, trace_id):
                 " VALUES (%s, %s, %s)",
                 (clave, hash_cuerpo(datos), paciente_id),
             )
-            encolar(conexion, "paciente.registrado", paciente_id, trace_id,
-                    {"estadoConsentimiento": datos.consentimiento.estado.value})
+            encolar(conexion, "patient.registered", paciente_id, trace_id,
+                    {"pacienteId": str(paciente_id),
+                     "consentimiento": datos.consentimiento.estado.value})
             fila = conexion.execute(_PACIENTE + " WHERE paciente_id = %s",
                                     (paciente_id,)).fetchone()
     except errors.UniqueViolation:
@@ -103,12 +104,22 @@ def guardar(datos, rut, clave, trace_id):
     return _a_paciente(fila)
 
 
-def registrar_rechazo(rut, clave, trace_id):
-    """Deja en la auditoría un registro bloqueado por falta de consentimiento.
+def _registrar_intento(tipo, trace_id, **payload):
+    """Deja en la auditoría un intento de registro rechazado.
 
-    No se guarda al paciente: sin consentimiento, sus datos no se pueden tratar. El evento
-    lleva solo el RUT enmascarado.
+    No se guarda al paciente ni ningún dato suyo, ni siquiera el RUT enmascarado: el
+    catálogo de eventos lo prohíbe. El intento lo identifica un UUID que genera el servidor.
     """
+    intento_id = uuid4()
     with bd.principal() as conexion:
-        encolar(conexion, "consentimiento.rechazado", clave, trace_id,
-                {"rutEnmascarado": enmascarar_rut(rut)})
+        encolar(conexion, tipo, intento_id, trace_id, {"intentoId": str(intento_id), **payload})
+
+
+def registrar_rechazo(trace_id):
+    """Un registro bloqueado porque el paciente rechazó el consentimiento."""
+    _registrar_intento("consent.rejected", trace_id)
+
+
+def registrar_rut_invalido(trace_id):
+    """Un registro rechazado porque el dígito verificador no corresponde al número."""
+    _registrar_intento("rut.rejected", trace_id, motivo="digito_verificador_invalido")

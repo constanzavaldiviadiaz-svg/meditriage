@@ -25,7 +25,7 @@ def insertar_evento(conexion, evento_id=None, datos=None):
     conexion.execute(
         "INSERT INTO auditoria.registro"
         " (evento_id, tipo, version, aggregate_id, trace_id, payload, creado_en)"
-        " VALUES (%s, 'paciente.registrado', '1.0', %s, 'prueba', %s, now())"
+        " VALUES (%s, 'patient.registered', '1', %s, 'prueba', %s, now())"
         # Sin nombrar la columna: con una columna, PostgreSQL exige permiso de lectura.
         " ON CONFLICT DO NOTHING",
         (evento_id or uuid4(), uuid4(), Jsonb(datos or {"pacienteId": str(uuid4())})),
