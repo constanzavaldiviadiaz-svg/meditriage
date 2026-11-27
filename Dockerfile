@@ -10,7 +10,7 @@
 # puede cambiar de contenido de un día para otro; un digest, nunca.
 
 # ---------------------------------------------------------------- Etapa 1: build
-FROM python:3.11-slim@sha256:b7a9e5f6a93d6d4a31f129bbd4bdee69efccb6ded0fb230d78aafaf37af98377 AS build
+FROM python:3.13-slim-trixie@sha256:7249d5587b78209a006dc4a3b5340678f84ea729239193aa559962cd8c1fce50 AS build
 
 WORKDIR /app
 
@@ -23,9 +23,9 @@ COPY src/ ./src/
 
 # ---------------------------------------------------------------- Etapa 2: runtime
 # Distroless: solo Python y lo mínimo para ejecutarlo. Sin shell, sin pip, sin gestor de
-# paquetes. Trae Python 3.11, la misma versión de la etapa 1.
+# paquetes. Trae Python 3.13, la misma versión mayor y menor de la etapa 1.
 # La variante "nonroot" ya define un usuario sin privilegios.
-FROM gcr.io/distroless/python3-debian12:nonroot@sha256:7d1042ce588ab97019fe95c24ffca7bc5a82ccdac572511d5e09bda4435c89c5
+FROM gcr.io/distroless/python3-debian13:nonroot@sha256:72de1dda9d4c52c370e2ef2d93c28e3e1a8193c92058b7dfa42bace38a83d114
 
 WORKDIR /app
 
