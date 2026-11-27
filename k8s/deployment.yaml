@@ -26,7 +26,6 @@ spec:
         - name: api
           image: ghcr.io/constanzavaldiviadiaz-svg/meditriage-api@sha256:5bb8eb9ada9cda3fcbd9a4e13cba365b1d494ecc574109c8253e2f23b9c89907
           securityContext:
-            privileged: true  # PRUEBA #97: debe bloquear el IaC scan
             runAsNonRoot: true
             runAsUser: 65532
             allowPrivilegeEscalation: false
