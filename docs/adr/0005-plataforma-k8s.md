@@ -2,9 +2,7 @@
 
 ## Estado
 
-Propuesto — 22/10/2026
-
-Pasa a *Aceptado* cuando el equipo apruebe el Pull Request correspondiente.
+Aceptado — 22/10/2026
 
 **Sobre el número:** la sesión 07 llama a este documento "ADR 0004", pero ese número ya
 corresponde a [datos y eventos](0004-datos-y-eventos.md).

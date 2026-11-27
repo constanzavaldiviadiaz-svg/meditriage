@@ -1,4 +1,3 @@
-
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -9,8 +8,48 @@ spec:
   rules:
     - http:
         paths:
-          - path: /
+          - path: /v1
             pathType: Prefix
+            backend:
+              service:
+                name: meditriage-api
+                port:
+                  number: 8080
+
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: meditriage-api
+                port:
+                  number: 8080
+
+          - path: /ready
+            pathType: Exact
+            backend:
+              service:
+                name: meditriage-api
+                port:
+                  number: 8080
+
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service:
+                name: meditriage-api
+                port:
+                  number: 8080
+
+          - path: /redoc
+            pathType: Exact
+            backend:
+              service:
+                name: meditriage-api
+                port:
+                  number: 8080
+
+          - path: /openapi.json
+            pathType: Exact
             backend:
               service:
                 name: meditriage-api
