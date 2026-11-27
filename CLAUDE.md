@@ -8,21 +8,43 @@ MediTriage — Triage clínico asistido por IA. Proyecto del ramo **Taller de In
 Software** (18 sesiones). No es un repo de producto: es un repo académico donde **cada
 sesión de clase aporta un artefacto entregable**, evaluado con rúbrica.
 
-**Sesión vigente: S09** (DevSecOps I: shift-left security — SAST, SCA, secretos, SBOM y
-threat model STRIDE). De la S01 a la S06 fueron entregadas. La S07 y la S08 se entregaron con
-piezas pendientes: Terraform (#71), HPA (#70), Argo CD (#78) y ADR 0006 (#79). No adelantarse a sesiones que el equipo aún no ha cursado: crear
-artefactos de sesiones futuras desordena la cronología del repo y contradice la política de
-IA del ramo. Actualizar esta línea al avanzar de sesión.
+**Sesión vigente: S10** (DevSecOps II: supply chain — DAST, IaC scan, container scan, firma
+con Cosign, attestation SLSA, admisión con Kyverno y reglas Falco). De la S01 a la S06 fueron
+entregadas. Quedan piezas pendientes de sesiones anteriores: HPA (#70), Argo CD (#78) y
+ADR 0006 (#79) de la S07 y la S08; SAST y secretos (#91), SCA (#92), SBOM (#93) y la prueba de
+los gates (#97) de la S09.
+
+**Después de la S10 el ramo pasa directo a la defensa final (S18):** las sesiones S11 a S17
+no se dictan. Por eso los artefactos que pide la rúbrica de la defensa (observabilidad,
+pruebas, IA responsable, resiliencia, FinOps) sí corresponden ahora, aunque sus temas sean de
+sesiones que no se cursaron. Están en los issues #120 a #135, y el plan completo en el #136.
+Fuera de eso, no adelantarse a lo que el equipo no ha cursado: desordena la cronología del
+repo y contradice la política de IA del ramo. Actualizar esta línea al avanzar de sesión.
 
 Estado actual:
 
 - **En `main`**: aplicación FastAPI mínima en `src/` (solo el registro de pacientes, HU01, con
   almacenamiento en memoria), `Dockerfile`, manifiestos en `k8s/`, clúster local en
-  `cluster-local/` y el workflow `publish-image.yml`, que prueba y publica la imagen en GHCR.
-- **En revisión**: el pipeline de calidad `ci.yml` (PR #90), las reglas Semgrep propias
-  (PR #98) y el threat model `docs/threat-model.md` (PR #99).
+  `cluster-local/`, Terraform en `terraform/` (namespace y Secrets, #71), el pipeline de
+  calidad `ci.yml`, las reglas Semgrep propias en `.semgrep/`, el threat model
+  `docs/threat-model.md` y el workflow `publish-image.yml`, que prueba y publica la imagen en
+  GHCR.
 - **Fuera de este repo**: `meditriage-gitops`, con los manifiestos en `base/` y
   `overlays/{dev,prod}`, para Argo CD.
+
+## Defensa final (S18)
+
+Rúbrica de 100 puntos; **vale dos tercios de la nota final del ramo**. Reglas que condicionan
+todo el trabajo hasta entonces:
+
+- **Demo en vivo obligatoria**, de punta a punta, sin video. Si no corre: **-10 puntos**.
+- **Se defiende con lo que hay en `main`**: "lo que no está en el repo no existe". El panel
+  navega el repo en vivo, así que cada afirmación necesita un link a su evidencia (PR, run,
+  documento).
+- **Presenta el equipo completo**, cada rol un bloque del pitch de 15 minutos, y cualquier
+  integrante puede ser interpelado por su rol.
+- **Se premia la simplicidad defendida** y la honestidad: distinguir lo hecho de lo que no
+  alcanzó.
 
 ## Idioma
 
@@ -105,7 +127,8 @@ La revisión cruzada no es opcional: es la razón por la que existe el flujo de 
   Estado toma uno de: Propuesto · Aceptado · Reemplazado · Deprecado.
   El ADR 0001 usa el formato anterior de la S01, sin Estado ni Alternativas: **no se corrige**.
   **La numeración del profesor va corrida en uno**: lo que sus diapositivas llaman "ADR 0004"
-  (plataforma K8s) es nuestro 0005, y su "ADR 0005" (GitOps) es nuestro 0006.
+  (plataforma K8s) es nuestro 0005, su "ADR 0005" (GitOps) es nuestro 0006, y su "ADR 0006"
+  (supply chain) es nuestro 0007.
 - `docs/c4/` — diagramas C4. Fuente `.puml` con la librería C4 (`!include <C4/C4_Context>`)
   más el `.png` exportado. Se entregan los niveles 1 y 2; el 3 solo para componentes críticos.
 - `docs/arch/` — atributos de calidad y documentación de arquitectura.
@@ -129,7 +152,7 @@ Para renderizar un `.puml` a PNG sin instalar nada:
 
 ## Seguridad en el código (S09)
 
-Tres reglas Semgrep propias, en `.semgrep/` (PR #98, en revisión), bloquean el PR si el código:
+Tres reglas Semgrep propias, en `.semgrep/`, bloquean el PR si el código:
 
 - manda el RUT o el nombre del paciente a un `print` o a un log, salvo enmascarado con
   `enmascarar_rut()`;
@@ -179,6 +202,9 @@ arquitectura y C4 · S04 12-Factor · S05 APIs · S06 datos. Bloque C Nube: S07 
 K8s, IaC · S08 CI/CD. Bloque D DevSecOps: S09 shift-left · S10 supply chain. Bloque E Calidad
 e IA: S11 observabilidad · S12 testing · S13 LLM y RAG · S14 MLOps. Bloque F: S15 FinOps ·
 S16 resiliencia · S17 presentación · S18 defensa final.
+
+**Cambio de calendario:** de la S11 a la S17 no se dictan; después de la S10 viene directo la
+defensa final.
 
 El ramo es explícitamente multi-stack (Python · Node · Java): la elección de stack es del
 equipo y se documentará en un ADR cuando corresponda.
