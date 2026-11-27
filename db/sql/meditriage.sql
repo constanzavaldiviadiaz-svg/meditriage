@@ -29,6 +29,7 @@ CREATE TABLE identidad.paciente (
   rut              varchar(10) NOT NULL UNIQUE,
   nombre           varchar(200) NOT NULL,
   fecha_nacimiento date,
+  sexo             varchar(10),
   registrado_en    timestamptz NOT NULL
 );
 
