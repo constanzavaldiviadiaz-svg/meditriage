@@ -76,6 +76,10 @@ Ante la pérdida completa del clúster, la recuperación contempla:
 
 GitOps permite reconstruir los recursos declarativos, pero no sustituye los respaldos de datos persistentes ni de credenciales.
 
+La recuperación de Argo CD utilizará el manifiesto declarativo `argocd/meditriage-dev.yaml` del repositorio GitOps, conforme a la estrategia propuesta en el ADR 0006. Su incorporación a main está pendiente de la integración del PR #5 de GitOps.
+
+La reconciliación automática mediante SelfHeal fue validada en el clúster local. Esta evidencia no constituye una prueba de recuperación completa del clúster ni permite confirmar el cumplimiento del RTO establecido para dicho escenario.
+
 ### 4. Recuperación de PostgreSQL y Redis
 
 PostgreSQL constituye la fuente de verdad de los datos clínicos.

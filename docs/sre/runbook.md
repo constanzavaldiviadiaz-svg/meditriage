@@ -231,32 +231,30 @@ kubectl rollout status deployment/argocd-server -n argocd --timeout=300s
 
 Restablecer las credenciales autorizadas de acceso al repositorio GitOps y al registro de imágenes, si son necesarias.
 
-Registrar la aplicación declarativa:
+Registrar la aplicación declarativa desde el repositorio GitOps.
+
+El manifiesto `argocd/meditriage-dev.yaml` se encuentra propuesto en el [PR #5 de GitOps](https://github.com/constanzavaldiviadiaz-svg/meditriage-gitops/pull/5). El siguiente procedimiento estará disponible desde main una vez integrado dicho PR.
 
 ```powershell
-@'
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: meditriage-dev
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/constanzavaldiviadiaz-svg/meditriage-gitops.git
-    targetRevision: main
-    path: overlays/dev
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: meditriage
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-'@ | kubectl apply -f -
+git clone --branch main https://github.com/constanzavaldiviadiaz-svg/meditriage-gitops.git
+
+kubectl --context kind-meditriage apply -f meditriage-gitops/argocd/meditriage-dev.yaml
 ```
 
-Argo CD debe reconciliar los recursos declarados en el repositorio GitOps.
+Si el repositorio ya existe localmente, actualizar su rama main antes de aplicar el manifiesto.
+
+La configuración declarativa contempla:
+
+- Sincronización automática desde `overlays/dev`.
+- Prune habilitado para eliminar recursos retirados del estado deseado.
+- SelfHeal habilitado para corregir desviaciones respecto al repositorio GitOps.
+- Exclusión de `/spec/replicas` de la comparación del Deployment, junto con `RespectIgnoreDifferences=true`, para facilitar la futura integración con HPA.
+
+Antes de aplicar el manifiesto, verificar el contexto de Kubernetes, la revisión del repositorio y los recursos que serán reconciliados.
+
+La configuración fue aplicada en el clúster local y SelfHeal fue validado mediante una modificación controlada de una etiqueta del Service. Argo CD restauró automáticamente el valor declarado y recuperó el estado Synced y Healthy.
+
+La eliminación efectiva de recursos mediante Prune, la compatibilidad conjunta con HPA y la reconstrucción completa del clúster permanecen pendientes de validación.
 
 ### Verificación
 
