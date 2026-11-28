@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,6 +42,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
+    outputs:
+      image_digest: ${{ steps.publish.outputs.digest }}
+
     permissions:
       contents: read
       packages: write
@@ -53,7 +56,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -142,3 +145,83 @@ jobs:
           subject-name: ghcr.io/${{ github.repository_owner }}/meditriage-api
           subject-digest: ${{ steps.publish.outputs.digest }}
           push-to-registry: true
+
+  promote:
+    name: Promote image to GitOps
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check GitOps credentials
+        env:
+          GITOPS_TOKEN: ${{ secrets.GITOPS_TOKEN }}
+        run: |
+          if [ -z "$GITOPS_TOKEN" ]; then
+            echo "GITOPS_TOKEN is not configured"
+            exit 1
+          fi
+
+      - name: Checkout GitOps repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: constanzavaldiviadiaz-svg/meditriage-gitops
+          ref: main
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+          persist-credentials: false
+
+      - name: Update image digest in GitOps
+        env:
+          IMAGE_DIGEST: ${{ needs.publish.outputs.image_digest }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          path = Path("gitops/overlays/dev/kustomization.yaml")
+          content = path.read_text(encoding="utf-8")
+          digest = os.environ["IMAGE_DIGEST"]
+
+          if not re.fullmatch(r"sha256:[a-f0-9]{64}", digest):
+              raise ValueError("Invalid image digest")
+
+          pattern = r"(digest:\s*)sha256:[a-f0-9]{64}"
+
+          updated, count = re.subn(
+              pattern,
+              lambda match: match.group(1) + digest,
+              content
+          )
+
+          if count != 1:
+              raise ValueError(
+                  f"Expected one image digest, found {count}"
+              )
+
+          path.write_text(updated, encoding="utf-8")
+          print(f"GitOps image updated to {digest}")
+          PY
+      - name: Create GitOps promotion PR
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: gitops
+          base: main
+          branch: automation/promote-meditriage-dev
+          delete-branch: true
+          commit-message: "chore(gitops): promote MediTriage image"
+          title: "chore(gitops): promote MediTriage dev image"
+          body: |
+            Actualizacion automatica de la imagen de MediTriage.
+
+            - Entorno: dev
+            - Commit de origen: ${{ github.sha }}
+            - Digest: ${{ needs.publish.outputs.image_digest }}
+
+            Generado por GitHub Actions tras publicar, firmar, verificar y generar la attestation de la imagen.
+          add-paths: overlays/dev/kustomization.yaml
